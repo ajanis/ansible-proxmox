@@ -1,0 +1,66 @@
+---
+galaxy_info:
+  author: Alan Janis
+  descri1ption: Build "Golden Image" (or any) QEMU and LXC templates for Proxmox PVE environment
+  company: Constructor Fleet
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: GPL-2.0-or-later
+
+  min_ansible_version: 2.9
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  #
+  # Provide a list of supported platforms, and for each platform a list of versions.
+  # If you don't wish to enumerate all versions for a particular platform, use 'all'.
+  # To view available platforms and versions (or releases), visit:
+  # https://galaxy.ansible.com/api/v1/platforms/
+
+  platforms:
+    - name: RedHat
+      versions:
+        - 9
+    - name: AlmaLinux
+      versions:
+        - 9
+    - name: RockyLinux
+      version:
+        - 9
+    - name: Ubuntu
+      versions:
+        - 22.04
+
+  galaxy_tags:
+    - proxmox
+    - qemu
+    - lxc
+    - template
+
+  dependencies:
+    - name: common
+      src: https://github.com/ajanis/ansible-common.git
+      version: v3.0
+    - name: openldap
+      src: https://github.com/ajanis/ansible-openldap.git
+      version: v6.0
+    - name: ceph-fs
+      src: https://github.com/ajanis/ansible-ceph-fs.git
+      version: v4.3
+    - name: docker
+      src: https://github.com/ajanis/ansible-docker.git
+      version: v9.6.0
+    - name: telegraf
+      src: https://github.com/ajanis/ansible-telegraf.git
+      version: v2.6.1

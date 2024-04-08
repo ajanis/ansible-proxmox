@@ -1,0 +1,49 @@
+---
+- name: pve_template_interactive | Prompt for new or existing template
+  ansible.builtin.pause:
+    prompt: |
+      Are you creating a [1] QEMU or [2] LXC Template?
+      -------------------------------------------------
+      [1] : QEMU TEMPLATE from upstream cloud image
+      [2] : LXC TEMPLATE from upstream cloud template
+      -------------------------------------------------
+  register: template_type_selection
+
+- name: pve_template_interactive | Set Template Type
+  ansible.builtin.set_fact:
+    proxmox_template_type: "{{ 'qemu' if template_type_selection.user_input == '1' else 'lxc' }}"
+  register: template_type_set
+  when:
+    - template_type_selection is defined
+    - template_type_selection != None
+
+- name: pve_template_interactive | Print Template Type Set
+  ansible.builtin.debug:
+    var: template_type_set
+  when:
+    - template_type_set is defined
+
+- name: pve_template_interactive | Print Template Type
+  ansible.builtin.debug:
+    msg: "Selection: {{ proxmox_template_type }}"
+  when:
+    - template_type_set is defined
+
+- name: pve_template_interactive | Prompt for new template image
+  ansible.builtin.pause:
+    prompt: |
+      Enter the numeric value for NEW Template OS/Release:
+      {% for template in proxmox_new_template_list | dict2items %}
+      {{ loop.index }} : {{ template.value.dist_name ~ '-' ~ template.value.dist_release }} ({{ proxmox_template_type }})
+      {% endfor %}
+  register: new_template_selection
+
+- name: pve_template_interactive | Set Template
+  ansible.builtin.set_fact:
+    proxmox_selected_template: "{{ (proxmox_new_template_list | dict2items)[new_template_selection.user_input | int - 1] | combine }}"
+  when: new_template_selection is defined
+
+- name: pve_template_interactive | Print Template Selection
+  ansible.builtin.debug:
+    msg: "Selection: {{ proxmox_selected_template.value.dist_name ~ '-' ~ proxmox_selected_template.value.dist_release }} ({{ proxmox_template_type }})"
+  when: proxmox_selected_template is defined

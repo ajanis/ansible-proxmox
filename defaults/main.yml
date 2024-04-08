@@ -1,0 +1,26 @@
+---
+# defaults file for ansible-pve-template
+vars:
+  vault_proxmox_ci_password: !vault |
+    $ANSIBLE_VAULT;1.1;AES256
+    64393566356362353763626439613837333261343961653331313464646235333631356536303336
+    6430633938636562626434333637313037343336633730610a353438633261636564386661393839
+    35623134326337366637356237396332356662383235383766353038386131666365306362326239
+    6133653061323238360a303866643831313065356266386438396133616135636636303536376434
+    3131
+  proxmox_api_host: 10.0.10.204
+  proxmox_pve_node: pve01
+  proxmox_api_user: root@pam
+  proxmox_api_token_id: "{{ vault_proxmox_api_token_id }}"
+  proxmox_api_token_secret: "{{ vault_proxmox_api_token_secret }}"
+  proxmox_api_password: "{{ vault_proxmox_api_password }}"
+  proxmox_temporary_vm_name: "{{ proxmox_template_name }}-builder"
+  proxmox_temporary_vm_hostname: "{{ proxmox_temporary_vm_name }}.{{ www_domain }}"
+  proxmox_temporary_vm_cidr: 10.0.10.10/24
+  proxmox_vm_storage: ceph-rbd
+  proxmox_vm_storage_format: raw
+  proxmox_vm_storage_default_size: 20
+  proxmox_ci_password: "{{ vault_proxmox_ci_password }}"
+  proxmox_template_basedir: /mnt/pve/cephfs/template
+  proxmox_iso_directory: "{{ proxmox_template_basedir }}/iso"
+  proxmox_lxd_directory: "{{ proxmox_template_basedir }}/cache"

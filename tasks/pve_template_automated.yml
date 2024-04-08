@@ -1,0 +1,23 @@
+---
+- name: pve_template_automated | Set Template Type
+  ansible.builtin.set_fact:
+    proxmox_template_type: "{{ 'lxc' if template_type == 'lxc' else 'qemu' }}"
+  register: template_type_set
+
+- name: pve_template_automated | Print Template Type Set
+  ansible.builtin.debug:
+    var: proxmox_template_type
+  when:
+    - template_type_set is defined
+
+- name: pve_template_automated | Set Template
+  ansible.builtin.set_fact:
+    proxmox_selected_template: "{{ proxmox_new_template_list | dict2items | select('search', template_name) | combine }}"
+  when:
+    - proxmox_template_type is defined
+
+- name: pve_template_automated | Print Template Selection
+  ansible.builtin.debug:
+    msg: "Selection: {{ proxmox_selected_template.value.dist_name ~ '-' ~ proxmox_selected_template.value.dist_release }} ({{ proxmox_template_type }})"
+  when:
+    - proxmox_selected_template is defined
