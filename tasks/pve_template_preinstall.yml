@@ -216,7 +216,7 @@
   when:
     - proxmox_template_type == "qemu"
 
-- name: pve_template_qemu_builder |  Ensure Static-IP is set for QEMU instance
+- name: pve_template_qemu_builder | Ensure Static-IP is set for QEMU instance
   community.general.proxmox_kvm:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -237,7 +237,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "qemu"
 
-- name: pve_template_qemu_builder |  Run Assertion
+- name: pve_template_qemu_builder | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_static_update }}"
@@ -245,7 +245,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "qemu"
 
-- name: pve_template_qemu_builder |  Start temporary QEMU instance
+- name: pve_template_qemu_builder | Start temporary QEMU instance
   community.general.proxmox_kvm:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -265,7 +265,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "qemu"
 
-- name: pve_template_qemu_builder |  Run Assertion
+- name: pve_template_qemu_builder | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_start }}"
@@ -299,7 +299,7 @@
 ### LXC BUILDER TASKS
 ## LXC SETUP TASKS TO CREATE A TEMPORARY INSTANCE
 
-- name: pve_template_lxc_setup |  Set facts for new template
+- name: pve_template_lxc_setup | Set facts for new template
   ansible.builtin.set_fact:
     proxmox_template_name: "{{ proxmox_selected_template.key }}-lxc-template"
     proxmox_temporary_vm_name: "{{ proxmox_selected_template.key }}-lxc-template-builder"
@@ -309,7 +309,7 @@
     proxmox_template_dist_name: "{{ proxmox_selected_template.value.dist_name }}"
   when:
     - proxmox_template_type == "lxc"
-- name: pve_template_lxc_setup |  Print facts for new template
+- name: pve_template_lxc_setup | Print facts for new template
   ansible.builtin.debug:
     msg: |
       Template Name: {{ proxmox_template_name }}
@@ -321,7 +321,7 @@
   when:
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_setup |  Download cloud image
+- name: pve_template_lxc_setup | Download cloud image
   ansible.builtin.get_url:
     url: "{{ proxmox_cloud_image_url }}"
     dest: /mnt/pve/cephfs/template/cache/
@@ -330,14 +330,14 @@
   when:
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_setup |  Print download details
+- name: pve_template_lxc_setup | Print download details
   ansible.builtin.debug:
     msg: "{{ cloud_image_download }}"
     verbosity: 1
   when:
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_setup |  Create template-builder container
+- name: pve_template_lxc_setup | Create template-builder container
   community.general.proxmox:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -376,7 +376,7 @@
   when:
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_setup |  Run Assertion
+- name: pve_template_lxc_setup | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_info }}"
