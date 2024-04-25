@@ -3,3 +3,20 @@
   ansible.builtin.apt:
     name: python3-proxmoxer
     state: present
+
+- name: Add pve-template main
+  ansible.builtin.include_tasks:
+    file: pve_template_interactive.yml
+  when:
+    - (interactive | bool) | default(true)
+
+- name: Add automated install tasks
+  ansible.builtin.include_tasks:
+    file: pve_template_automated.yml
+  when:
+    - not (interactive | bool) | default(true)
+
+- name: Run preinstall tasks
+  ansible.builtin.include_tasks:
+    file: template_preinstall.yml
+
