@@ -98,6 +98,8 @@
   when:
     - image_conversion is changed
     - proxmox_template_type == "qemu"
+  changed_when:
+    - libguestfs_commands is defined
   loop_control:
     loop_var: proxmox_libguestfs_command
   loop:

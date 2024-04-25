@@ -1,6 +1,6 @@
 ---
 ### LXC POST INSTALL TASKS TO FINISH ANY REMAINING CONFIGURATION AND CREATE THE NEW LXC TEMPLATE
-- name: pve_template_lxc_postinstall | Stop temporary LXC instance
+- name: pve_template_postinstall | Stop temporary LXC instance
   community.general.proxmox:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -20,7 +20,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_stop }}"
@@ -28,11 +28,11 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_postinstall | Wait for any background processes to complete
+- name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
     timeout: 15
 
-- name: pve_template_lxc_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags
+- name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags
   community.general.proxmox:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -59,7 +59,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_update }}"
@@ -67,11 +67,11 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_postinstall | Wait for any background processes to complete
+- name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
     timeout: 15
 
-- name: pve_template_lxc_postinstall | Create LXC template
+- name: pve_template_postinstall | Create LXC template
   community.general.proxmox:
     api_user: "{{ proxmox_api_user }}"
     api_token_id: "{{ proxmox_api_token_id }}"
@@ -89,7 +89,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ template_conversion }}"
@@ -97,7 +97,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_template_type == "lxc"
 
-- name: pve_template_lxc_postinstall | Pausing to confirm template creation from temporary VM
+- name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
   ansible.builtin.pause:
     prompt: |
       CAUTION: The following step will remove the SOURCE TEMPLATE with VMID: {{ proxmox_current_template_vmid }}!!
@@ -108,7 +108,7 @@
     - proxmox_template_type == "lxc"
     - proxmox_current_template_vmid is defined
 
-- name: pve_template_lxc_postinstall | Removing old template
+- name: pve_template_postinstall | Removing old template
   community.general.proxmox:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -126,7 +126,7 @@
   until: template_destroy is not failed
   timeout: 300
 
-- name: pve_template_lxc_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ template_destroy }}"
@@ -135,7 +135,7 @@
     - proxmox_current_template_vmid is defined
 
 ### QEMU POST-INSTALL TASKS TO FINISH ANY CONFIGURATION AND CREATE NEW QEMU TEMPLATE
-- name: pve_template_qemu_postinstall | Stop temporary QEMU instance
+- name: pve_template_postinstall | Stop temporary QEMU instance
   community.general.proxmox_kvm:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -155,7 +155,7 @@
     - proxmox_template_type == "qemu"
     - proxmox_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_stop }}"
@@ -163,11 +163,11 @@
     - proxmox_template_type == "qemu"
     - proxmox_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_postinstall | Wait for any background processes to complete
+- name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
     timeout: 15
 
-- name: pve_template_qemu_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags for
+- name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags for
   community.general.proxmox_kvm:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -194,7 +194,7 @@
   when:
     - proxmox_template_type == "qemu"
     - proxmox_temporary_vm_vmid is defined
-- name: pve_template_qemu_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ temporary_vm_update }}"
@@ -202,11 +202,11 @@
     - proxmox_template_type == "qemu"
     - proxmox_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_postinstall | Wait for any background processes to complete
+- name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
     timeout: 15
 
-- name: pve_template_qemu_postinstall | Create QEMU template from ID
+- name: pve_template_postinstall | Create QEMU template from ID
   community.general.proxmox_kvm:
     api_user: "{{ proxmox_api_user }}"
     api_token_id: "{{ proxmox_api_token_id }}"
@@ -224,7 +224,7 @@
     - proxmox_template_type == "qemu"
     - proxmox_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ template_conversion }}"
@@ -232,7 +232,7 @@
     - proxmox_template_type == "qemu"
     - proxmox_temporary_vm_vmid is defined
     - proxmox_current_template_vmid is defined
-- name: pve_template_qemu_postinstall | Pausing to confirm template creation from temporary VM
+- name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
   ansible.builtin.pause:
     prompt: |
       CAUTION: The following step will remove the SOURCE TEMPLATE with VMID: {{ proxmox_current_template_vmid }}!!
@@ -242,7 +242,7 @@
     - proxmox_temporary_vm_vmid is defined
     - proxmox_current_template_vmid is defined
 
-- name: pve_template_qemu_postinstall | Removing old template
+- name: pve_template_postinstall | Removing old template
   community.general.proxmox_kvm:
     api_user: "{{ proxmox_api_user }}"
     api_password: "{{ proxmox_api_password }}"
@@ -261,7 +261,7 @@
   until: template_destroy is not failed
   timeout: 300
 
-- name: pve_template_qemu_postinstall | Run Assertion
+- name: pve_template_postinstall | Run Assertion
   ansible.builtin.import_tasks: pve_handlers.yml
   vars:
     assertion_task: "{{ template_destroy }}"
