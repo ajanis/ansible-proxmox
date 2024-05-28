@@ -21,7 +21,7 @@
     - pve_template_template_type == "lxc"
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_stop }}"
   when:
@@ -60,7 +60,7 @@
     - pve_template_template_type == "lxc"
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_update }}"
   when:
@@ -90,7 +90,7 @@
     - pve_template_template_type == "lxc"
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ template_conversion }}"
   when:
@@ -127,7 +127,7 @@
   timeout: 300
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ template_destroy }}"
   when:
@@ -156,7 +156,7 @@
     - pve_template_temporary_vm_vmid is defined
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_stop }}"
   when:
@@ -195,7 +195,7 @@
     - pve_template_template_type == "qemu"
     - pve_template_temporary_vm_vmid is defined
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_update }}"
   when:
@@ -225,7 +225,7 @@
     - pve_template_temporary_vm_vmid is defined
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ template_conversion }}"
   when:
@@ -262,7 +262,7 @@
   timeout: 300
 
 - name: pve_template_postinstall | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ template_destroy }}"
   when:

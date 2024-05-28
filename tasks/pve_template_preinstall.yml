@@ -15,14 +15,14 @@
 - name: pve_template_preinstall | Print information retrieved for existing template
   ansible.builtin.debug:
     var: item.vmid
-  loop: "{{ current_template_info.pve_template_vms }}"
+  loop: "{{ current_template_info.proxmox_vms }}"
   when:
     - pve_template_selected_template.key in item.name
 
 - name: pve_template_preinstall | Set facts for current template
   ansible.builtin.set_fact:
     pve_template_current_template_vmid: "{{ item.vmid | default(omit) }}"
-  loop: "{{ current_template_info.pve_template_vms }}"
+  loop: "{{ current_template_info.proxmox_vms }}"
   when:
     - pve_template_selected_template.key in item.name
 
@@ -68,6 +68,8 @@
   ansible.builtin.get_url:
     url: "{{ pve_template_cloud_image_url }}"
     dest: /tmp/
+    tmp_dest: /tmp/
+    checksum: sha256:https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS
     mode: "0744"
   register: cloud_image_download
   when:
@@ -158,10 +160,11 @@
     numa_enabled: true
     net:
       net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
+    efidisk0: ceph-rbd:0,format=raw,efitype=4m,pre-enrolled-keys=1,size=4M
     ipconfig:
       ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
     scsi:
-      scsi0: ceph-rbd:0,import-from={{ pve_template_template_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
+      scsi0: ceph-rbd:1,import-from={{ pve_template_template_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
     sata:
       sata0: ceph-rbd:cloudinit,media=cdrom
     scsihw: virtio-scsi-single
@@ -169,7 +172,7 @@
     boot: order=scsi0;net0
     ostype: l26
     machine: q35
-    bios: seabios
+    bios: ovmf
     acpi: true
     hotplug: disk,network,usb,memory,cpu,cloudinit
     kvm: true
@@ -184,7 +187,7 @@
     - pve_template_template_type == "qemu"
 
 - name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_info }}"
   when:
@@ -193,7 +196,7 @@
 - name: pve_template_qemu_setup | Grow VM disk to 15GB # noqa command-instead-of-shell no-changed-when run-once
   ansible.builtin.shell:
     cmd: qm resize {{ temporary_vm_info.vmid }} scsi0 15G
-  delegate_to: pve01.home.prettybaked.com
+  delegate_to: "{{ pve_template_pve_node }}"
   run_once: true
   register: temporary_vm_disk_resize
   retries: 0
@@ -203,7 +206,7 @@
     - pve_template_template_type == "qemu"
 
 - name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_disk_resize }}"
   when:
@@ -242,7 +245,7 @@
     - pve_template_template_type == "qemu"
 
 - name: pve_template_qemu_builder | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_static_update }}"
   when:
@@ -270,7 +273,7 @@
     - pve_template_template_type == "qemu"
 
 - name: pve_template_qemu_builder | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_start }}"
   when:
@@ -381,7 +384,7 @@
     - pve_template_template_type == "lxc"
 
 - name: pve_template_lxc_setup | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_info }}"
   when:
@@ -420,7 +423,7 @@
     - pve_template_template_type == "lxc"
 
 - name: pve_template_lxc_builder | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_static_update }}"
   when:
@@ -447,7 +450,7 @@
     - pve_template_temporary_vm_vmid is defined
 
 - name: pve_template_lxc_builder | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ temporary_vm_start }}"
   when:
@@ -489,7 +492,7 @@
     - (pve_template_template_dist_name == 'Rocky') or (pve_template_template_dist_name == 'AlmaLinux') or (pve_template_template_dist_name == 'CentOS')
 
 - name: pve_template_lxc_builder | Run Assertion
-  ansible.builtin.import_tasks: pve_handlers.yml
+  ansible.builtin.include_tasks: pve_handler.yml
   vars:
     assertion_task: "{{ lxc_install_openssh }}"
   when:

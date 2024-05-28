@@ -1,7 +1,7 @@
 ---
 - name: pve_template_automated | Set Template Type
   ansible.builtin.set_fact:
-    pve_template_template_type: "{{ 'lxc' if template_type == 'lxc' else 'qemu' }}"
+    pve_template_template_type: "{{ 'lxc' if pve_template_template_type == 'lxc' else 'qemu' }}"
   register: template_type_set
 
 - name: pve_template_automated | Print Template Type Set
@@ -12,7 +12,7 @@
 
 - name: pve_template_automated | Set Template
   ansible.builtin.set_fact:
-    pve_template_selected_template: "{{ pve_template_cloud_images | dict2items | select('search', template_name) | combine }}"
+    pve_template_selected_template: "{{ pve_template_cloud_images | dict2items | select('search', pve_template_template_name) | combine }}"
   when:
     - pve_template_template_type is defined
 

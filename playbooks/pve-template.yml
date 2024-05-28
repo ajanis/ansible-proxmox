@@ -17,9 +17,16 @@
   roles:
     - role: pve-template
       vars:
-        interactive: "{{ interactive }}"
-        template_type: "{{ template_type }}"
-        template_name: "{{ template_name }}"
+        pve_template_interactive: "{{ interactive | default(true) }}"
+        pve_template_template_type: "{{ template_type | default('qemu') }}"
+        pve_template_template_name: "{{ template_name | default('ubuntu2204') }}"
+  post_tasks:
+    - name: Include Tasks
+      ansible.builtin.include_tasks:
+        file: "{{ item }}"
+      loop:
+        - ../localroles/wait_for.yml
+        - ../localroles/end_play.yml
 
 - name: Run custom Ansible roles for template_tmp group
   hosts: template_tmp

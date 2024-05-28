@@ -15,7 +15,6 @@ pve_template_template_basedir: /etc/pve/templates
 pve_template_iso_directory: "{{ pve_template_template_basedir }}/iso"
 pve_template_lxc_directory: "{{ pve_template_template_basedir }}/cache"
 pve_template_ci_ssh_keys: {}
-pve_template_roles: {}
 pve_template_cloud_images:
   rocky9:
     dist_name: Rocky
@@ -43,14 +42,14 @@ pve_template_cloud_images:
     dist_release: 22.04
     dist_baseurl: cloud-images.ubuntu.com
     dist_arch: x86_64
-    dist_url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img
+    dist_url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
     lxc_url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64-lxd.tar.xz
   ubuntu2404:
     dist_name: Ubuntu
     dist_release: 24.04
     dist_baseurl: cloud-images.ubuntu.com
     dist_arch: x86_64
-    dist_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+    dist_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
     lxc_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64-lxd.tar.xz
 
 # vault_pve_template_api_token_secret:
