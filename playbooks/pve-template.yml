@@ -1,0 +1,65 @@
+---
+- name: |
+    Create QEMU or LXC 'Golden Image' Templates for Proxmox.
+    Base image configration handled by libguestFS (Cloud-Init)
+    Templates are pre-configured with our Ansible Roles:
+      - Common (Distro/Python Pakage` Auth Configs, SSHD / Login Coonfigs, Sudoers, OS/Package Autoupdate/Cloud-Init, QEMU Guest-Agent, Serial-Over-Lan configs)
+      - OpenLDAP (Client Configurations provide Users/Groups, User SSH Keys and User Home Directory AutoFS Configurations via CephFS)
+      - CephFS (Client Configurations, Data.mount and Media.mount services, User Home Directories)
+  hosts: template_builder
+  remote_user: root
+  gather_facts: true
+  tags:
+    - preinstall
+  vars_files:
+    - vault.yml
+    - group_vars/template_builder/vars.yml
+  roles:
+    - role: pve-template
+      vars:
+        interactive: "{{ interactive }}"
+        template_type: "{{ template_type }}"
+        template_name: "{{ template_name }}"
+
+- name: Run custom Ansible roles for template_tmp group
+  hosts: template_tmp
+  remote_user: root
+  gather_facts: true
+  vars_files:
+    - vault.yml
+    - group_vars/template_builder/vars.yml
+  tags:
+    - ansible-base
+
+  roles:
+    - role: common
+      tags:
+        - common
+    - role: openldap
+      tags:
+        - openldap
+    - role: ceph-fs
+      tags:
+        - cephfs
+  post_tasks:
+    - name: Include Tasks
+      ansible.builtin.include_tasks:
+        file: "{{ item }}"
+      loop:
+        - ../localroles/wait_for.yml
+        - ../localroles/end_play.yml
+
+- name: Stop temporary instance and update name, pool, tags and set network to DHCP
+  hosts: template_builder
+  remote_user: root
+  gather_facts: true
+  vars_files:
+    - vault.yml
+    - group_vars/template_builder/vars.yml
+  tags:
+    - post-install
+  tasks:
+    - name: Run post-installation tasks
+      ansible.builtin.include_role:
+        name: pve-template
+        tasks_from: pve_template_postinstall.yml
