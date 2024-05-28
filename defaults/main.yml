@@ -1,26 +1,59 @@
 ---
 # defaults file for ansible-pve-template
-vars:
-  vault_proxmox_ci_password: !vault |
-    $ANSIBLE_VAULT;1.1;AES256
-    64393566356362353763626439613837333261343961653331313464646235333631356536303336
-    6430633938636562626434333637313037343336633730610a353438633261636564386661393839
-    35623134326337366637356237396332356662383235383766353038386131666365306362326239
-    6133653061323238360a303866643831313065356266386438396133616135636636303536376434
-    3131
-  proxmox_api_host: 10.0.10.204
-  proxmox_pve_node: pve01
-  proxmox_api_user: root@pam
-  proxmox_api_token_id: "{{ vault_proxmox_api_token_id }}"
-  proxmox_api_token_secret: "{{ vault_proxmox_api_token_secret }}"
-  proxmox_api_password: "{{ vault_proxmox_api_password }}"
-  proxmox_temporary_vm_name: "{{ proxmox_template_name }}-builder"
-  proxmox_temporary_vm_hostname: "{{ proxmox_temporary_vm_name }}.{{ www_domain }}"
-  proxmox_temporary_vm_cidr: 10.0.10.10/24
-  proxmox_vm_storage: ceph-rbd
-  proxmox_vm_storage_format: raw
-  proxmox_vm_storage_default_size: 20
-  proxmox_ci_password: "{{ vault_proxmox_ci_password }}"
-  proxmox_template_basedir: /mnt/pve/cephfs/template
-  proxmox_iso_directory: "{{ proxmox_template_basedir }}/iso"
-  proxmox_lxd_directory: "{{ proxmox_template_basedir }}/cache"
+pve_template_api_host: proxmox-api.local
+pve_template_pve_node: proxmox-pve
+pve_template_api_user: root@pam
+pve_template_api_token_id: "{{ vault_pve_template_api_token_id | mandatory }}"
+pve_template_api_token_secret: "{{ vault_pve_template_api_token_secret | mandatory }}"
+pve_template_api_password: "{{ vault_pve_template_api_password | mandatory }}"
+pve_template_temporary_vm_cidr: 10.0.10.10/24
+pve_template_vm_storage: local
+pve_template_vm_storage_format: raw
+pve_template_vm_storage_default_size: 15
+pve_template_ci_password: "{{ vault_pve_template_ci_password | mandatory }}"
+pve_template_template_basedir: /etc/pve/templates
+pve_template_iso_directory: "{{ pve_template_template_basedir }}/iso"
+pve_template_lxc_directory: "{{ pve_template_template_basedir }}/cache"
+pve_template_ci_ssh_keys: {}
+pve_template_roles: {}
+pve_template_cloud_images:
+  rocky9:
+    dist_name: Rocky
+    dist_release: 9
+    dist_baseurl: dl.rockylinux.org
+    dist_arch: x86_64
+    dist_url: https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2
+    lxc_url: http://download.proxmox.com/images/system/rockylinux-9-default_20221109_amd64.tar.xz
+  almalinux9:
+    dist_name: AlmaLinux
+    dist_release: 9
+    dist_baseurl: repo.almalinux.org
+    dist_arch: x86_64
+    dist_url: https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-latest.x86_64.qcow2
+    lxc_url: http://download.proxmox.com/images/system/almalinux-9-default_20221108_amd64.tar.xz
+  centos9:
+    dist_name: CentOS
+    dist_release: 9-Stream
+    dist_baseurl: cloud.centos.org
+    dist_arch: x86_64
+    dist_url: https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2
+    lxc_url: http://download.proxmox.com/images/system/centos-9-stream-default_20221109_amd64.tar.xz
+  ubuntu2204:
+    dist_name: Ubuntu
+    dist_release: 22.04
+    dist_baseurl: cloud-images.ubuntu.com
+    dist_arch: x86_64
+    dist_url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img
+    lxc_url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64-lxd.tar.xz
+  ubuntu2404:
+    dist_name: Ubuntu
+    dist_release: 24.04
+    dist_baseurl: cloud-images.ubuntu.com
+    dist_arch: x86_64
+    dist_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+    lxc_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64-lxd.tar.xz
+
+# vault_pve_template_api_token_secret:
+# vault_pve_template_api_token_id:
+# vault_pve_template_api_password:
+# vault_pve_template_ci_password:
