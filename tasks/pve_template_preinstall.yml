@@ -44,6 +44,7 @@
     pve_template_template_name: "{{ pve_template_selected_template.key }}-template"
     pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-template-builder"
     pve_template_cloud_image_url: "{{ pve_template_selected_template.value.dist_url }}"
+    pve_template_checksum: "{{ pve_template_selected_template.value.dist_checksum }}"
     pve_template_cloud_image_file: "{{ pve_template_selected_template.value.dist_url | basename }}"
     pve_template_cloud_image_path: /tmp/{{ pve_template_selected_template.value.dist_url | basename }}
     pve_template_template_file: "{{ (pve_template_selected_template.value.dist_url | basename) | regex_replace('(^.*)\\..+$', '\\1.img') }}"
@@ -61,6 +62,7 @@
       Raw Image File Name: {{ pve_template_template_file }}
       Raw Image Full Path: {{ pve_template_template_path }}
       Temporary VM Name: {{ pve_template_temporary_vm_name }}
+      Cloud Image Checksum: {{ pve_template_checksum }}
   when:
     - pve_template_template_type == "qemu"
 
@@ -69,7 +71,7 @@
     url: "{{ pve_template_cloud_image_url }}"
     dest: /tmp/
     tmp_dest: /tmp/
-    checksum: sha256:https://cloud-images.ubuntu.com/jammy/current/SHA256SUMS
+    checksum: "{{ pve_template_checksum }}"
     mode: "0744"
   register: cloud_image_download
   when:
@@ -160,11 +162,15 @@
     numa_enabled: true
     net:
       net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
-    efidisk0: ceph-rbd:0,format=raw,efitype=4m,pre-enrolled-keys=1,size=4M
+    efidisk0:
+      storage: ceph-rbd
+      format: raw
+      efitype: 4m
+      pre_enrolled_keys: true
     ipconfig:
       ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
     scsi:
-      scsi0: ceph-rbd:1,import-from={{ pve_template_template_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
+      scsi0: ceph-rbd:0,import-from={{ pve_template_template_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
     sata:
       sata0: ceph-rbd:cloudinit,media=cdrom
     scsihw: virtio-scsi-single

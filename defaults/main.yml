@@ -40,14 +40,14 @@ pve_template_cloud_images:
   ubuntu2204:
     dist_name: Ubuntu
     dist_release: 22.04
-    dist_baseurl: cloud-images.ubuntu.com
+    dist_checksum: sha256:https://cloud-images.ubuntu.com/releases/22.04/release/SHA256SUMS
     dist_arch: x86_64
     dist_url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
     lxc_url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64-lxd.tar.xz
   ubuntu2404:
     dist_name: Ubuntu
     dist_release: 24.04
-    dist_baseurl: cloud-images.ubuntu.com
+    dist_checksum: sha256:https://cloud-images.ubuntu.com/releases/24.04/release/SHA256SUMS
     dist_arch: x86_64
     dist_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
     lxc_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64-lxd.tar.xz
