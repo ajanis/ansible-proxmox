@@ -290,10 +290,9 @@
   ansible.builtin.wait_for:
     host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
     port: 22
-    timeout: 120
   delay: 120
-  retries: 3
-  timeout: 0
+  retries: 10
+  timeout: 300
   when:
     - pve_template_template_type == "qemu"
 - name: pve_template_preinstall | Add temporary VM to 'template_tmp' group
@@ -505,6 +504,3 @@
     - pve_template_template_type == "lxc"
     - pve_template_temporary_vm_vmid is defined
     - (pve_template_template_dist_name == 'Rocky') or (pve_template_template_dist_name == 'AlmaLinux') or (pve_template_template_dist_name == 'CentOS')
-
-# - name: pve_template_preinstall | Move ahead to next playbook
-#   ansible.builtin.meta: end_play
