@@ -1,4 +1,14 @@
 ---
+- name: Check mandatory variables are defined
+  ansible.builtin.assert:
+    that:
+      - pve_template_api_token_secret
+      - pve_template_api_token_id
+      - pve_template_api_password
+      - pve_template_ci_password
+    success_msg: VALUES ARE set
+    fail_msg: VALUE is not set.  Create a vault-encrypted value
+
 - name: Install proxmoxer
   ansible.builtin.apt:
     name: python3-proxmoxer
@@ -6,16 +16,16 @@
 
 - name: Add pve-template main
   ansible.builtin.include_tasks:
-    file: pve_template_interactive.yml
-  when:
-    - (interactive | bool) | default(true)
-
-- name: Add automated install tasks
-  ansible.builtin.include_tasks:
-    file: pve_template_automated.yml
-  when:
-    - not (interactive | bool) | default(true)
+    file: pve_template_{{ 'interactive' if (interactive | bool) else 'automated' }}.yml
 
 - name: Run preinstall tasks
   ansible.builtin.include_tasks:
     file: pve_template_preinstall.yml
+
+- name: Run preinstall tasks
+  ansible.builtin.include_tasks:
+    file: pve_template_install.yml
+
+- name: Run preinstall tasks
+  ansible.builtin.include_tasks:
+    file: pve_template_postinstall.yml

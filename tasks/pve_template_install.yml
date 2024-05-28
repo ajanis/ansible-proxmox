@@ -1,0 +1,19 @@
+---
+# Roles/Tasks to be executed inside of the image
+
+- name: pve_template_install | Run setup on temporary host
+  ansible.builtin.setup:
+  delegate_to: "{{ template_tmp }}"
+
+- name: pve_template_install | Include custom roles
+  ansible.builtin.include_role:
+    name: "{{ item }}"
+  loop: "{{ pve_template_roles }}"
+  delegate_to: "{{ template_tmp }}"
+  when:
+    - pve_template_roles is defined
+    - pve_template_roles | length > 0
+
+- name: pve_template_install | Wait for any background processes to complete
+  ansible.builtin.wait_for:
+    timeout: 15
