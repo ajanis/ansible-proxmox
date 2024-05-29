@@ -21,7 +21,7 @@
         pve_template_interactive: "{{ interactive | default(true) }}"
         pve_template_template_type: "{{ template_type | default('qemu') }}"
         pve_template_template_name: "{{ template_name | default('ubuntu2204') }}"
-        pve_template_temporary_vm_cidr: "{{ (ip | default('10.0.10.10/24')) | ipaddr }}"
+        pve_template_temporary_vm_cidr: "{{ (ip | default('10.0.10.10/24')) | ansible.utils.ipaddr }}"
   post_tasks:
     - name: Include Tasks
       ansible.builtin.include_tasks:
