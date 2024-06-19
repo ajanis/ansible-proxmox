@@ -96,6 +96,7 @@
   when:
     - image_conversion is changed
     - pve_template_template_type == "qemu"
+
 - name: pve_template_qemu_setup | Run libguestfs commands against image
   ansible.builtin.command:
     cmd: "{{ pve_template_libguestfs_command }}"
@@ -109,6 +110,7 @@
     loop_var: pve_template_libguestfs_command
   loop:
     - virt-customize -a {{ pve_template_template_path }} --root-password 'password:tmpRootPass'
+    - virt-customize -a {{ pve_template_template_path }} --install 'openssh-server'
     - virt-customize -a {{ pve_template_template_path }} --run-command 'mkdir -p /root/.ssh'
     - virt-customize -a {{ pve_template_template_path }} --run-command 'touch /root/.ssh/authorized_keys'
     - virt-customize -a {{ pve_template_template_path }} --copy-in '/etc/systemd/system/data.mount:/etc/systemd/system/'
