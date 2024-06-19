@@ -304,7 +304,7 @@
     pve_template_temporary_vm_name: "{{ pve_template_temporary_vm_name }}"
     name: "{{ pve_template_temporary_vm_name }}"
     ansible_host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
-    ansible_python_interpreter: /usr/bin/env python3
+    # ansible_python_interpreter: /usr/bin/env python3
     pve_template_temporary_vm_vmid: "{{ pve_template_temporary_vm_vmid }}"
     pve_template_template_type: "{{ pve_template_template_type }}"
   when:
