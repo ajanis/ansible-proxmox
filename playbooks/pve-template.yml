@@ -27,8 +27,8 @@
       ansible.builtin.include_tasks:
         file: "{{ item }}"
       loop:
-        - ../localroles/wait_for.yml
-        - ../localroles/end_play.yml
+        - ../tasks/wait_for.yml
+        - ../tasks/end_play.yml
 
 - name: Run custom Ansible roles for template_tmp group
   hosts: template_tmp
@@ -55,8 +55,8 @@
       ansible.builtin.include_tasks:
         file: "{{ item }}"
       loop:
-        - ../localroles/wait_for.yml
-        - ../localroles/end_play.yml
+        - ../tasks/wait_for.yml
+        - ../tasks/end_play.yml
 
 - name: Stop temporary instance and update name, pool, tags and set network to DHCP
   hosts: template_builder
