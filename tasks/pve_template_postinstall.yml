@@ -86,8 +86,8 @@
     vmid: "{{ pve_template_temporary_vm_vmid }}"
   register: template_conversion
   until: template_conversion is not failed
-  retries: 10
-  timeout: 60
+  retries: 0
+  timeout: 300
   delay: 10
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -104,13 +104,24 @@
 - name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
   ansible.builtin.pause:
     prompt: |
-      CAUTION: The following step will remove the SOURCE TEMPLATE with VMID: {{ pve_template_current_template_vmid }}!!
-      Please verify the creation/configuration of NEW TEMPLATE {{ pve_template_template_name }} with VMID: {{ pve_template_temporary_vm_vmid }}
-      Press [ENTER/RETURN] to REMOVE THE SOURCE TEMPLATE if you are satisfied.
+      =========================================================================================================
+
+      {% if pve_template_current_template_vmid is defined and pve_template_current_template_vmid != pve_template_temporary_vm_vmid %}
+          !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid | default('') }} !!!
+
+      {% endif %}
+          Please verify that the following NEW template has been created and configured completely:
+
+            Template Name: {{ pve_template_template_name }}
+            Template VMID: {{ pve_template_temporary_vm_vmid }}
+
+          Press [ENTER/RETURN] to continue...
+
+      =========================================================================================================
   when:
-    - pve_template_temporary_vm_vmid is defined
     - pve_template_template_type == "lxc"
-    - pve_template_current_template_vmid is defined
+    - pve_template_temporary_vm_vmid is defined
+    - template_conversion is succeeded
 
 - name: pve_template_postinstall | Removing old template
   community.general.proxmox:
@@ -125,10 +136,12 @@
   when:
     - pve_template_template_type == "lxc"
     - pve_template_current_template_vmid is defined
+    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
+
   register: template_destroy
   until: template_destroy is not failed
-  retries: 10
-  timeout: 60
+  retries: 0
+  timeout: 300
   delay: 10
 
 - name: pve_template_postinstall | Run Assertion
@@ -138,6 +151,7 @@
   when:
     - pve_template_template_type == "lxc"
     - pve_template_current_template_vmid is defined
+    - template_destroy is defined
 
 ### QEMU POST-INSTALL TASKS TO FINISH ANY CONFIGURATION AND CREATE NEW QEMU TEMPLATE
 - name: pve_template_postinstall | Stop temporary QEMU instance
@@ -226,8 +240,8 @@
     state: template
   register: template_conversion
   until: template_conversion is not failed
-  retries: 10
-  timeout: 60
+  retries: 0
+  timeout: 300
   delay: 10
   when:
     - pve_template_template_type == "qemu"
@@ -240,15 +254,14 @@
   when:
     - pve_template_template_type == "qemu"
     - pve_template_temporary_vm_vmid is defined
-    - pve_template_current_template_vmid is defined
 
 - name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
   ansible.builtin.pause:
     prompt: |
       =========================================================================================================
 
-      {% if pve_template_temporary_vm_vmid != pve_template_current_template_vmid %}
-          !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid }} !!!
+      {% if pve_template_current_template_vmid is defined and pve_template_current_template_vmid != pve_template_temporary_vm_vmid %}
+          !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid | default('') }} !!!
 
       {% endif %}
           Please verify that the following NEW template has been created and configured completely:
@@ -261,8 +274,8 @@
       =========================================================================================================
 
   when:
+    - pve_template_template_type == "qemu"
     - pve_template_temporary_vm_vmid is defined
-    - pve_template_current_template_vmid is defined
     - template_conversion is succeeded
 
 - name: pve_template_postinstall | Removing old template
@@ -277,12 +290,13 @@
     template: true
     state: absent
   when:
-    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
     - pve_template_template_type == "qemu"
+    - pve_template_current_template_vmid is defined
+    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
   register: template_destroy
   until: template_destroy is not failed
-  retries: 10
-  timeout: 60
+  retries: 0
+  timeout: 300
   delay: 10
 
 - name: pve_template_postinstall | Run Assertion
@@ -290,9 +304,9 @@
   vars:
     assertion_task: "{{ template_destroy }}"
   when:
-    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
-    - template_destroy is defined
     - pve_template_template_type == "qemu"
+    - pve_template_current_template_vmid is defined
+    - template_destroy is defined
 
 - name: pve_template_postinstall | Remove downloaded image
   ansible.builtin.file:

@@ -81,6 +81,7 @@
   ansible.builtin.command:
     cmd: qemu-img convert -f qcow2 -O raw {{ pve_template_cloud_image_path }} {{ pve_template_template_path }}
   register: image_conversion
+  changed_when: image_conversion is defined
   when:
     - pve_template_template_type == "qemu"
     - cloud_image_download is changed
@@ -183,8 +184,8 @@
     agent: enabled=1,fstrim_cloned_disks=1
     pool: Templates
   register: temporary_vm_info
-  retries: 10
-  timeout: 60
+  retries: 0
+  timeout: 300
   delay: 10
   until: temporary_vm_info is not failed
   when:
@@ -384,8 +385,8 @@
     unprivileged: false
     swap: 0
   register: temporary_vm_info
-  retries: 10
-  timeout: 60
+  retries: 0
+  timeout: 300
   delay: 10
   until: temporary_vm_info is not failed
   when:
