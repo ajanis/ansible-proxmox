@@ -151,7 +151,7 @@
   when:
     - pve_template_template_type == "lxc"
     - pve_template_current_template_vmid is defined
-    - template_destroy is defined
+    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
 
 ### QEMU POST-INSTALL TASKS TO FINISH ANY CONFIGURATION AND CREATE NEW QEMU TEMPLATE
 - name: pve_template_postinstall | Stop temporary QEMU instance
@@ -306,7 +306,7 @@
   when:
     - pve_template_template_type == "qemu"
     - pve_template_current_template_vmid is defined
-    - template_destroy is defined
+    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
 
 - name: pve_template_postinstall | Remove downloaded image
   ansible.builtin.file:
