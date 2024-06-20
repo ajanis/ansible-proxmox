@@ -245,11 +245,21 @@
 - name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
   ansible.builtin.pause:
     prompt: |
+      =========================================================================================================
+
       {% if pve_template_temporary_vm_vmid != pve_template_current_template_vmid %}
-          CAUTION: The following step will remove a PRE-EXISTING template] with VMID: {{ pve_template_current_template_vmid }}
+          !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid }} !!!
+
       {% endif %}
-      Please verify that the NEW template has been created with NAME: {{ pve_template_template_name }} and VMID: {{ pve_template_temporary_vm_vmid }}
-      Press [ENTER/RETURN] to continue.
+          Please verify that the following NEW template has been created and configured completely:
+
+            Template Name: {{ pve_template_template_name }}
+            Template VMID: {{ pve_template_temporary_vm_vmid }}
+
+          Press [ENTER/RETURN] to continue...
+
+      =========================================================================================================
+
   when:
     - pve_template_temporary_vm_vmid is defined
     - pve_template_current_template_vmid is defined
