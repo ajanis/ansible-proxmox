@@ -76,19 +76,15 @@
   register: cloud_image_download
   when:
     - pve_template_template_type == "qemu"
-- name: pve_template_qemu_setup | Print download details
-  ansible.builtin.debug:
-    msg: "{{ cloud_image_download }}"
-    verbosity: 1
-  when:
-    - pve_template_template_type == "qemu"
+
 - name: pve_template_qemu_setup | Convert image to raw
   ansible.builtin.command:
     cmd: qemu-img convert -f qcow2 -O raw {{ pve_template_cloud_image_path }} {{ pve_template_template_path }}
-    creates: "{{ pve_template_template_path }}"
   register: image_conversion
   when:
     - pve_template_template_type == "qemu"
+    - cloud_image_download is changed
+
 - name: pve_template_qemu_setup | Image conversion results
   ansible.builtin.debug:
     msg: "{{ image_conversion.stdout }}"
@@ -96,6 +92,14 @@
   when:
     - image_conversion is changed
     - pve_template_template_type == "qemu"
+
+- name: pve_template_qemu_setup | Remove downloaded image
+  ansible.builtin.file:
+    name: "{{ pve_template_cloud_image_path }}"
+    state: absent
+  when:
+    - pve_template_template_type == "qemu"
+    - image_conversion is succeeded
 
 - name: pve_template_qemu_setup | Run libguestfs commands against image
   ansible.builtin.command:
@@ -273,8 +277,9 @@
     kvm: true
     state: started
   register: temporary_vm_start
-  retries: 0
-  timeout: 330
+  retries: 5
+  timeout: 60
+  delay: 30
   until: temporary_vm_start is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -292,11 +297,12 @@
   ansible.builtin.wait_for:
     host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
     port: 22
-  delay: 120
-  retries: 10
-  timeout: 300
+  retries: 5
+  timeout: 60
+  delay: 30
   when:
     - pve_template_template_type == "qemu"
+
 - name: pve_template_preinstall | Add temporary VM to 'template_tmp' group
   ansible.builtin.add_host:
     groups:
