@@ -253,6 +253,7 @@
   when:
     - pve_template_temporary_vm_vmid is defined
     - pve_template_current_template_vmid is defined
+    - template_conversion is succeeded
 
 - name: pve_template_postinstall | Removing old template
   community.general.proxmox_kvm:
@@ -282,3 +283,11 @@
     - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
     - template_destroy is defined
     - pve_template_template_type == "qemu"
+
+- name: pve_template_postinstall | Remove downloaded image
+  ansible.builtin.file:
+    name: "{{ pve_template_cloud_image_path }}"
+    state: absent
+  when:
+    - pve_template_template_type == "qemu"
+    - template_conversion is succeeded

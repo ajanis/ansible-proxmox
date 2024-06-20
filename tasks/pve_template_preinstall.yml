@@ -93,14 +93,6 @@
     - image_conversion is changed
     - pve_template_template_type == "qemu"
 
-- name: pve_template_qemu_setup | Remove downloaded image
-  ansible.builtin.file:
-    name: "{{ pve_template_cloud_image_path }}"
-    state: absent
-  when:
-    - pve_template_template_type == "qemu"
-    - image_conversion is succeeded
-
 - name: pve_template_qemu_setup | Run libguestfs commands against image
   ansible.builtin.command:
     cmd: "{{ pve_template_libguestfs_command }}"
