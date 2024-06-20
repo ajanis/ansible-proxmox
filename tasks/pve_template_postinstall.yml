@@ -232,12 +232,15 @@
     - pve_template_template_type == "qemu"
     - pve_template_temporary_vm_vmid is defined
     - pve_template_current_template_vmid is defined
+
 - name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
   ansible.builtin.pause:
     prompt: |
-      CAUTION: The following step will remove the SOURCE TEMPLATE with VMID: {{ pve_template_current_template_vmid }}!!
-      Please verify the creation/configuration of NEW TEMPLATE {{ pve_template_template_name }} with VMID: {{ pve_template_temporary_vm_vmid }}
-      Press [ENTER/RETURN] to REMOVE THE SOURCE TEMPLATE if you are satisfied.
+      {% if pve_template_temporary_vm_vmid != pve_template_current_template_vmid %}
+          CAUTION: The following step will remove a PRE-EXISTING template] with VMID: {{ pve_template_current_template_vmid }}
+      {% endif %}
+      Please verify that the NEW template has been created with NAME: {{ pve_template_template_name }} and VMID: {{ pve_template_temporary_vm_vmid }}
+      Press [ENTER/RETURN] to continue.
   when:
     - pve_template_temporary_vm_vmid is defined
     - pve_template_current_template_vmid is defined
@@ -255,7 +258,7 @@
     state: absent
     timeout: 300
   when:
-    - pve_template_current_template_vmid is defined
+    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
     - pve_template_template_type == "qemu"
   register: template_destroy
   until: template_destroy is not failed
@@ -266,5 +269,6 @@
   vars:
     assertion_task: "{{ template_destroy }}"
   when:
-    - pve_template_current_template_vmid is defined
+    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
+    - template_destroy is defined
     - pve_template_template_type == "qemu"
