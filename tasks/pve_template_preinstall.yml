@@ -183,10 +183,9 @@
     kvm: true
     agent: enabled=1,fstrim_cloned_disks=1
     pool: Templates
+    timeout: 300
   register: temporary_vm_info
-  retries: 0
   timeout: 300
-  delay: 10
   until: temporary_vm_info is not failed
   when:
     - pve_template_template_type == "qemu"
@@ -204,9 +203,7 @@
   delegate_to: "{{ pve_template_pve_node }}"
   run_once: true
   register: temporary_vm_disk_resize
-  retries: 10
-  timeout: 60
-  delay: 10
+  timeout: 300
   until: temporary_vm_disk_resize is not failed
   when:
     - pve_template_template_type == "qemu"
@@ -243,9 +240,7 @@
       ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
     update: true
   register: temporary_vm_static_update
-  retries: 10
-  timeout: 60
-  delay: 10
+  timeout: 300
   until: temporary_vm_static_update is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -272,9 +267,7 @@
     kvm: true
     state: started
   register: temporary_vm_start
-  retries: 10
-  timeout: 60
-  delay: 10
+  timeout: 300
   until: temporary_vm_start is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -384,10 +377,9 @@
       mp2: ceph-rbd:5,mp=/var,size=5G
     unprivileged: false
     swap: 0
+    timeout: 300
   register: temporary_vm_info
-  retries: 0
   timeout: 300
-  delay: 10
   until: temporary_vm_info is not failed
   when:
     - pve_template_template_type == "lxc"
@@ -423,9 +415,7 @@
       net0: gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }},ip={{ pve_template_temporary_vm_cidr }}
     unprivileged: false
   register: temporary_vm_static_update
-  retries: 10
-  timeout: 60
-  delay: 10
+  timeout: 300
   until: temporary_vm_static_update is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -451,9 +441,7 @@
     vmid: "{{ pve_template_temporary_vm_vmid }}"
     state: started
   register: temporary_vm_start
-  retries: 10
-  timeout: 60
-  delay: 10
+  timeout: 300
   until: temporary_vm_start is not failed
   when:
     - pve_template_template_type == "lxc"
