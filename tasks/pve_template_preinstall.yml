@@ -154,8 +154,8 @@
     ciuser: root
     cipassword: "{{ pve_template_ci_password }}"
     nameservers:
+      - 10.0.10.1
       - 10.0.10.222
-      - 192.168.1.1
     searchdomains:
       - home.prettybaked.com
     sshkeys: "{{ pve_template_ci_ssh_keys }}"
