@@ -286,9 +286,8 @@
     host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
     port: 22
     search_regex: OpenSSH
-  retries: 10
-  timeout: 60
-  delay: 10
+    connect_timeout: 300
+    delay: 60
   when:
     - pve_template_template_type == "qemu"
 
@@ -458,9 +457,8 @@
     host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
     port: 22
     search_regex: OpenSSH
-  retries: 10
-  timeout: 60
-  delay: 10
+    connect_timeout: 300
+    delay: 60
   when:
     - pve_template_template_type == "lxc"
 - name: pve_template_preinstall | Add temporary VM to 'template_tmp' group
