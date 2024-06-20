@@ -13,8 +13,9 @@
     state: stopped
     force: true
   register: temporary_vm_stop
-  retries: 0
-  timeout: 80
+  retries: 10
+  timeout: 60
+  delay: 10
   until: temporary_vm_stop is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -30,7 +31,7 @@
 
 - name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
-    timeout: 15
+    timeout: 30
 
 - name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags
   community.general.proxmox:
@@ -52,8 +53,9 @@
       - telegraf
       - "{{ pve_template_template_name | replace('-lxc-template', '') }}"
   register: temporary_vm_update
-  retries: 0
+  retries: 10
   timeout: 60
+  delay: 10
   until: temporary_vm_update is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
@@ -69,7 +71,7 @@
 
 - name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
-    timeout: 15
+    timeout: 30
 
 - name: pve_template_postinstall | Create LXC template
   community.general.proxmox:
@@ -84,7 +86,9 @@
     vmid: "{{ pve_template_temporary_vm_vmid }}"
   register: template_conversion
   until: template_conversion is not failed
-  timeout: 300
+  retries: 10
+  timeout: 60
+  delay: 10
   when:
     - pve_template_temporary_vm_vmid is defined
     - pve_template_template_type == "lxc"
@@ -118,13 +122,14 @@
     node: "{{ pve_template_pve_node }}"
     vmid: "{{ pve_template_current_template_vmid }}"
     state: absent
-    timeout: 300
   when:
     - pve_template_template_type == "lxc"
     - pve_template_current_template_vmid is defined
   register: template_destroy
   until: template_destroy is not failed
-  timeout: 300
+  retries: 10
+  timeout: 60
+  delay: 10
 
 - name: pve_template_postinstall | Run Assertion
   ansible.builtin.include_tasks: pve_handler.yml
@@ -148,8 +153,9 @@
     state: stopped
     force: true
   register: temporary_vm_stop
-  retries: 0
-  timeout: 80
+  retries: 10
+  timeout: 60
+  delay: 10
   until: temporary_vm_stop is not failed
   when:
     - pve_template_template_type == "qemu"
@@ -165,7 +171,7 @@
 
 - name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
-    timeout: 15
+    timeout: 30
 
 - name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags for
   community.general.proxmox_kvm:
@@ -188,8 +194,9 @@
       - telegraf
       - "{{ pve_template_template_name | replace('-template', '') }}"
   register: temporary_vm_update
-  retries: 0
+  retries: 10
   timeout: 60
+  delay: 10
   until: temporary_vm_update is not failed
   when:
     - pve_template_template_type == "qemu"
@@ -204,7 +211,7 @@
 
 - name: pve_template_postinstall | Wait for any background processes to complete
   ansible.builtin.wait_for:
-    timeout: 15
+    timeout: 30
 
 - name: pve_template_postinstall | Create QEMU template from ID
   community.general.proxmox_kvm:
@@ -219,7 +226,9 @@
     state: template
   register: template_conversion
   until: template_conversion is not failed
-  timeout: 300
+  retries: 10
+  timeout: 60
+  delay: 10
   when:
     - pve_template_template_type == "qemu"
     - pve_template_temporary_vm_vmid is defined
@@ -256,13 +265,14 @@
     vmid: "{{ pve_template_current_template_vmid }}"
     template: true
     state: absent
-    timeout: 300
   when:
     - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
     - pve_template_template_type == "qemu"
   register: template_destroy
   until: template_destroy is not failed
-  timeout: 300
+  retries: 10
+  timeout: 60
+  delay: 10
 
 - name: pve_template_postinstall | Run Assertion
   ansible.builtin.include_tasks: pve_handler.yml
