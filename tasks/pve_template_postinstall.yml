@@ -308,10 +308,15 @@
     - pve_template_current_template_vmid is defined
     - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
 
-- name: pve_template_postinstall | Remove downloaded image
+- name: pve_template_postinstall | Remove download and working images
   ansible.builtin.file:
-    name: "{{ pve_template_cloud_image_path }}"
+    name: "{{ pve_template_image }}"
     state: absent
+  loop:
+    - "{{ pve_template_cloud_image_path }}"
+    - "{{ pve_template_disk_image_path }}"
+  loop_control:
+    loop_var: pve_template_image
   when:
     - pve_template_template_type == "qemu"
     - template_conversion is succeeded

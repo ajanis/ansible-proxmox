@@ -39,37 +39,41 @@
 
 ### QEMU SETUP TASKS TO CREATE A TEMPORARY GUEST
 
-- name: pve_template_qemu_setup | Set facts for new template
+- name: pve_template_qemu_setup | Set facts for source image
   ansible.builtin.set_fact:
     pve_template_template_name: "{{ pve_template_selected_template.key }}-template"
     pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-template-builder"
     pve_template_cloud_image_url: "{{ pve_template_selected_template.value.dist_url }}"
+    pve_template_cloud_image: "{{ pve_template_selected_template.value.dist_url | basename }}"
+    pve_template_disk_image: "{{ (pve_template_selected_template.value.dist_url | basename) | regex_replace('(^.*)\\..+$', '\\1.img') }}"
     pve_template_checksum: "{{ pve_template_selected_template.value.dist_checksum }}"
-    pve_template_cloud_image_file: "{{ pve_template_selected_template.value.dist_url | basename }}"
-    pve_template_cloud_image_path: /tmp/{{ pve_template_selected_template.value.dist_url | basename }}
-    pve_template_template_file: "{{ (pve_template_selected_template.value.dist_url | basename) | regex_replace('(^.*)\\..+$', '\\1.img') }}"
-    pve_template_template_path: "{{ pve_template_iso_directory }}/{{ (pve_template_selected_template.value.dist_url | basename) | regex_replace('(^.*)\\..+$', '\\\
-      1.img') }}"
+
   when:
     - pve_template_template_type == "qemu"
+
+- name: pve_template_qemu_setup | Set facts for working disk image
+  ansible.builtin.set_fact:
+    pve_template_cloud_image_path: /tmp/{{ pve_template_cloud_image }}
+    pve_template_disk_image_path: /tmp/{{ pve_template_disk_image }}
+  when:
+    - pve_template_template_type == "qemu"
+
 - name: pve_template_qemu_setup | Print facts for new template
   ansible.builtin.debug:
     msg: |
       Template Name: {{ pve_template_template_name }}
       Download URL: {{ pve_template_cloud_image_url }}
-      Cloud Image File Name: {{ pve_template_cloud_image_file }}
-      Cloud Image Full Path: {{ pve_template_cloud_image_path }}
-      Raw Image File Name: {{ pve_template_template_file }}
-      Raw Image Full Path: {{ pve_template_template_path }}
       Temporary VM Name: {{ pve_template_temporary_vm_name }}
       Cloud Image Checksum: {{ pve_template_checksum }}
+      Cloud Image: {{ pve_template_cloud_image_path }}
+      Raw Image: {{ pve_template_disk_image_path }}
   when:
     - pve_template_template_type == "qemu"
 
 - name: pve_template_qemu_setup | Download cloud image
   ansible.builtin.get_url:
     url: "{{ pve_template_cloud_image_url }}"
-    dest: /tmp/
+    dest: "{{ pve_template_cloud_image_path }}"
     tmp_dest: /tmp/
     checksum: "{{ pve_template_checksum }}"
     mode: "0744"
@@ -77,22 +81,30 @@
   when:
     - pve_template_template_type == "qemu"
 
+- name: pve_template_qemu_setup | Run Assertion
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ cloud_image_download }}"
+  when:
+    - pve_template_template_type == "qemu"
+    - cloud_image_download is changed
+
 - name: pve_template_qemu_setup | Convert image to raw
   ansible.builtin.command:
-    cmd: qemu-img convert -f qcow2 -O raw {{ pve_template_cloud_image_path }} {{ pve_template_template_path }}
+    cmd: qemu-img convert -f qcow2 -O raw {{ pve_template_cloud_image_path }} {{ pve_template_disk_image_path }}
   register: image_conversion
   changed_when: image_conversion is defined
   when:
     - pve_template_template_type == "qemu"
     - cloud_image_download is changed
 
-- name: pve_template_qemu_setup | Image conversion results
-  ansible.builtin.debug:
-    msg: "{{ image_conversion.stdout }}"
-    verbosity: 1
+- name: pve_template_qemu_setup | Run Assertion
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ image_conversion }}"
   when:
-    - image_conversion is changed
     - pve_template_template_type == "qemu"
+    - image_conversion is changed
 
 - name: pve_template_qemu_setup | Run libguestfs commands against image
   ansible.builtin.command:
@@ -106,34 +118,42 @@
   loop_control:
     loop_var: pve_template_libguestfs_command
   loop:
-    - virt-customize -a {{ pve_template_template_path }} --root-password 'password:tmpRootPass'
-    - virt-customize -a {{ pve_template_template_path }} --install 'openssh-server'
-    - virt-customize -a {{ pve_template_template_path }} --run-command 'mkdir -p /root/.ssh'
-    - virt-customize -a {{ pve_template_template_path }} --run-command 'touch /root/.ssh/authorized_keys'
-    - virt-customize -a {{ pve_template_template_path }} --copy-in '/etc/systemd/system/data.mount:/etc/systemd/system/'
-    - virt-customize -a {{ pve_template_template_path }} --copy-in '/etc/systemd/system/media.mount:/etc/systemd/system/'
-    - virt-customize -a {{ pve_template_template_path }} --copy-in '/opt/ceph:/opt/'
-    - virt-customize -a {{ pve_template_template_path }} --run-command 'systemctl daemon-reload'
-    - virt-customize -a {{ pve_template_template_path }} --run-command 'systemctl enable data.mount'
-    - virt-customize -a {{ pve_template_template_path }} --run-command 'systemctl enable media.mount'
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/disable_root: true/disable_root: false/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/disable_root: True/disable_root: False/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/disable_root: 1/disable_root: 0/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: True/lock_passwd: False/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: true/lock_passwd: false/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: 1/lock_passwd: 0/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: False/ssh_pwauth: True/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: false/ssh_pwauth: true/'"
-    - "virt-edit -a {{ pve_template_template_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
+    - virt-customize -a {{ pve_template_disk_image_path }} --root-password 'password:tmpRootPass'
+    - virt-customize -a {{ pve_template_disk_image_path }} --install 'openssh-server'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'mkdir -p /root/.ssh'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'touch /root/.ssh/authorized_keys'
+    - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/data.mount:/etc/systemd/system/'
+    - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/media.mount:/etc/systemd/system/'
+    - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/opt/ceph:/opt/'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable data.mount'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable media.mount'
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: true/disable_root: false/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: True/disable_root: False/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: 1/disable_root: 0/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: True/lock_passwd: False/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: true/lock_passwd: false/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: 1/lock_passwd: 0/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: False/ssh_pwauth: True/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: false/ssh_pwauth: true/'"
+    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
 
-- name: pve_template_qemu_setup | Print results of libguestfs commands
-  ansible.builtin.debug:
-    msg: |
-      {{ libguestfs_commands }}
-    verbosity: 1
+- name: pve_template_qemu_setup | Run Assertion
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ libguestfs_commands }}"
   when:
     - pve_template_template_type == "qemu"
     - libguestfs_commands is changed
+
+# - name: pve_template_qemu_setup | Print results of libguestfs commands
+#   ansible.builtin.debug:
+#     msg: |
+#       {{ libguestfs_commands }}
+#     verbosity: 1
+#   when:
+#     - pve_template_template_type == "qemu"
+#     - libguestfs_commands is changed
 
 - name: pve_template_qemu_setup | Create pve_template_temporary_vm_name
   community.general.proxmox_kvm:
@@ -169,7 +189,7 @@
     ipconfig:
       ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
     scsi:
-      scsi0: ceph-rbd:0,import-from={{ pve_template_template_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
+      scsi0: ceph-rbd:0,import-from={{ pve_template_disk_image_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
     sata:
       sata0: ceph-rbd:cloudinit,media=cdrom
     scsihw: virtio-scsi-single
@@ -312,20 +332,20 @@
     pve_template_template_name: "{{ pve_template_selected_template.key }}-lxc-template"
     pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-lxc-template-builder"
     pve_template_cloud_image_url: "{{ pve_template_selected_template.value.lxc_url }}"
-    pve_template_template_file: "{{ pve_template_selected_template.value.lxc_url | basename }}"
-    pve_template_template_path: "{{ pve_template_lxc_directory }}/{{ pve_template_selected_template.value.lxc_url | basename }}"
+    pve_template_disk_image: "{{ pve_template_selected_template.value.lxc_url | basename }}"
+    pve_template_disk_image_path: "{{ pve_template_lxc_directory }}/{{ pve_template_selected_template.value.lxc_url | basename }}"
     pve_template_template_dist_name: "{{ pve_template_selected_template.value.dist_name }}"
   when:
     - pve_template_template_type == "lxc"
+
 - name: pve_template_lxc_setup | Print facts for new template
   ansible.builtin.debug:
     msg: |
       Template Name: {{ pve_template_template_name }}
       Download URL: {{ pve_template_cloud_image_url }}
-      Raw Image File Name: {{ pve_template_template_file }}
-      Raw Image Full Path: {{ pve_template_template_path }}
       Temporary VM Name: {{ pve_template_temporary_vm_name }}
       Distribution: {{ pve_template_template_dist_name }}
+      LXC Template: {{ pve_template_disk_image_path }}
   when:
     - pve_template_template_type == "lxc"
 
@@ -338,12 +358,20 @@
   when:
     - pve_template_template_type == "lxc"
 
-- name: pve_template_lxc_setup | Print download details
-  ansible.builtin.debug:
-    msg: "{{ cloud_image_download }}"
-    verbosity: 1
+- name: pve_template_qemu_builder | Run Assertion
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ cloud_image_download }}"
   when:
+    - cloud_image_download is defined
     - pve_template_template_type == "lxc"
+
+# - name: pve_template_lxc_setup | Print download details
+#   ansible.builtin.debug:
+#     msg: "{{ cloud_image_download }}"
+#     verbosity: 1
+#   when:
+#     - pve_template_template_type == "lxc"
 
 - name: pve_template_lxc_setup | Create template-builder container
   community.general.proxmox:
@@ -354,7 +382,7 @@
     state: present
     password: "{{ pve_template_ci_password }}"
     hostname: "{{ pve_template_temporary_vm_name }}"
-    ostemplate: cephfs:vztmpl/{{ pve_template_template_file }}
+    ostemplate: cephfs:vztmpl/{{ pve_template_disk_image }}
     ostype: auto
     netif:
       net0: name=eth0,bridge=vmbr0,mtu=9000,firewall=1,gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }},ip={{
@@ -395,11 +423,11 @@
     pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
   when:
     - pve_template_template_type == "lxc"
-- name: pve_template_preinstall | Print pve_template_temporary_vm_vmid
-  ansible.builtin.debug:
-    msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
-  when:
-    - pve_template_template_type == "lxc"
+# - name: pve_template_preinstall | Print pve_template_temporary_vm_vmid
+#   ansible.builtin.debug:
+#     msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
+#   when:
+#     - pve_template_template_type == "lxc"
 
 - name: pve_template_lxc_builder | Ensure Static-IP is set for LXC instance
   community.general.proxmox:
