@@ -12,19 +12,23 @@
     config: current
   register: current_template_info
 
+- name: pve_template_preinstall | Set fact for existing template name
+  ansible.builtin.set_fact:
+    template_matchstring: ^{{ pve_template_selected_template.key }}.*-template$
+
 - name: pve_template_preinstall | Print information retrieved for existing template
   ansible.builtin.debug:
-    var: item.vmid
+    var: item
   loop: "{{ current_template_info.proxmox_vms }}"
   when:
-    - pve_template_selected_template.key in item.name
+    - item.name is match(template_matchstring)
 
 - name: pve_template_preinstall | Set facts for current template
   ansible.builtin.set_fact:
     pve_template_current_template_vmid: "{{ item.vmid | default(omit) }}"
   loop: "{{ current_template_info.proxmox_vms }}"
   when:
-    - pve_template_selected_template.key in item.name
+    - item.name is match(template_matchstring)
 
 - name: pve_template_preinstall | Print details for current template
   ansible.builtin.debug:
@@ -53,7 +57,7 @@
 
 - name: pve_template_qemu_setup | Set facts for working disk image
   ansible.builtin.set_fact:
-    pve_template_cloud_image_path: /tmp/{{ pve_template_cloud_image }}
+    pve_template_cloud_image_path: /tmp/source_{{ pve_template_cloud_image }}
     pve_template_disk_image_path: /tmp/{{ pve_template_disk_image }}
   when:
     - pve_template_template_type == "qemu"
