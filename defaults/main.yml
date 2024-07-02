@@ -54,6 +54,8 @@ pve_template_cloud_images:
     dist_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
     lxc_url: http://download.proxmox.com/images/system/ubuntu-24.04-standard_24.04-2_amd64.tar.zst
 
+pve_template_lxc_ssh_pubkey: ''
+
 # vault_pve_template_api_token_secret:
 # vault_pve_template_api_token_id:
 # vault_pve_template_api_password:
