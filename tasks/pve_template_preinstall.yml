@@ -399,7 +399,7 @@
     storage: ceph-rbd
     timezone: host
     pool: Templates
-    pubkey: "{{ vault_network_ed25519_pubkey }}"
+    pubkey: "{{ network_ed25519_pubkey }}"
     disk: 10
     # hookscript: "{{ 'cephfs:snippets/ssh_install.sh' if (pve_template_template_dist_name == 'Rocky') or (pve_template_template_dist_name == 'AlmaLinux') else omit }}"
     # disk: "ceph-rbd:10,mp=rootfs,acl=0,quota=0,replicate=0,ro=0,size=10G"
