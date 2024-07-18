@@ -1,7 +1,7 @@
 ---
 ### THESE TASKS RUN AGAINST BOTH HOSTS HOWEVER THE COLLECTED INFORMATION WILL BE COLLECTED FOR ONLY THE RELEVANT TEMPLATE TYPE
 ### COLLECT THE TEMPLATE INFOIRMATION FOR THE CORRESPONDING OS AND TEMPLATE TYPE SELECTED
-- name: pve_template_preinstall | Retrieve information for pve_template_template_name
+- name: pve_template_preinstall | Retrieve information for {{ pve_template_template_name }}
   community.general.proxmox_vm_info:
     api_user: "{{ pve_template_api_user }}"
     api_token_id: "{{ pve_template_api_token_id }}"
@@ -124,14 +124,12 @@
   loop:
     - virt-customize -a {{ pve_template_disk_image_path }} --root-password 'password:tmpRootPass'
     - virt-customize -a {{ pve_template_disk_image_path }} --install 'openssh-server'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command '[[ -e /etc/selinux/config ]] && sed -i s/enforcing/disabled/ /etc/selinux/config'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'mkdir -p /root/.ssh'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'touch /root/.ssh/authorized_keys'
     - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/data.mount:/etc/systemd/system/'
     - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/media.mount:/etc/systemd/system/'
     - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/opt/ceph:/opt/'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable data.mount'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable media.mount'
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: true/disable_root: false/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: True/disable_root: False/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: 1/disable_root: 0/'"
@@ -141,6 +139,10 @@
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: False/ssh_pwauth: True/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: false/ssh_pwauth: true/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable sshd'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable data.mount'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable media.mount'
 
 - name: pve_template_qemu_setup | Run Assertion
   ansible.builtin.include_tasks: pve_handler.yml
@@ -159,7 +161,7 @@
 #     - pve_template_template_type == "qemu"
 #     - libguestfs_commands is changed
 
-- name: pve_template_qemu_setup | Create pve_template_temporary_vm_name
+- name: pve_template_qemu_setup | Create {{ pve_template_temporary_vm_name }}
   community.general.proxmox_kvm:
     api_user: "{{ pve_template_api_user }}"
     api_password: "{{ pve_template_api_password }}"
@@ -170,11 +172,8 @@
     autostart: false
     ciuser: root
     cipassword: "{{ pve_template_ci_password }}"
-    nameservers:
-      - 10.0.10.1
-      - 10.0.10.222
-    searchdomains:
-      - home.prettybaked.com
+    nameservers: "{{ pve_template_ci_nameservers | default(omit) }}"
+    searchdomains: "{{ pve_template_ci_nameservers | default(omit) }}"
     sshkeys: "{{ pve_template_ci_ssh_keys }}"
     cpu: host,flags=+md-clear;+pcid;+spec-ctrl;+ssbd;+aes
     sockets: 2
@@ -239,12 +238,12 @@
   when:
     - pve_template_template_type == "qemu"
 
-- name: pve_template_preinstall | Set pve_template_temporary_vm_vmid
+- name: pve_template_preinstall | Set {{ pve_template_temporary_vm_vmid }}
   ansible.builtin.set_fact:
     pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
   when:
     - pve_template_template_type == "qemu"
-- name: pve_template_preinstall | Print pve_template_temporary_vm_vmid
+- name: pve_template_preinstall | Print {{ pve_template_temporary_vm_vmid }}
   ansible.builtin.debug:
     msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
   when:
