@@ -123,8 +123,7 @@
     loop_var: pve_template_libguestfs_command
   loop:
     - virt-customize -a {{ pve_template_disk_image_path }} --root-password 'password:tmpRootPass'
-    - virt-customize -a {{ pve_template_disk_image_path }} --install 'openssh-server'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command '[[ -e /etc/selinux/config ]] && sed -i s/enforcing/disabled/ /etc/selinux/config'
+    - virt-customize -a {{ pve_template_disk_image_path }} --install 'vim,bash-completion,wget,curl,unzip,qemu-guest-agent,openssh-server'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'mkdir -p /root/.ssh'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'touch /root/.ssh/authorized_keys'
     - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/data.mount:/etc/systemd/system/'
@@ -139,10 +138,11 @@
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: False/ssh_pwauth: True/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: false/ssh_pwauth: true/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
+    - virt-customize -a {{ pve_template_disk_image_path }} --selinux-relabel
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable sshd'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable data.mount'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable media.mount'
+    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable qemu-guest-agent'
 
 - name: pve_template_qemu_setup | Run Assertion
   ansible.builtin.include_tasks: pve_handler.yml
@@ -151,15 +151,6 @@
   when:
     - pve_template_template_type == "qemu"
     - libguestfs_commands is changed
-
-# - name: pve_template_qemu_setup | Print results of libguestfs commands
-#   ansible.builtin.debug:
-#     msg: |
-#       {{ libguestfs_commands }}
-#     verbosity: 1
-#   when:
-#     - pve_template_template_type == "qemu"
-#     - libguestfs_commands is changed
 
 - name: pve_template_qemu_setup | Create {{ pve_template_temporary_vm_name }}
   community.general.proxmox_kvm:
@@ -170,11 +161,6 @@
     name: "{{ pve_template_temporary_vm_name }}"
     state: present
     autostart: false
-    ciuser: root
-    cipassword: "{{ pve_template_ci_password }}"
-    nameservers: "{{ pve_template_ci_nameservers | default(omit) }}"
-    searchdomains: "{{ pve_template_ci_nameservers | default(omit) }}"
-    sshkeys: "{{ pve_template_ci_ssh_keys }}"
     cpu: host,flags=+md-clear;+pcid;+spec-ctrl;+ssbd;+aes
     sockets: 2
     cores: 2
@@ -185,18 +171,21 @@
     net:
       net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
     efidisk0:
-      storage: ceph-rbd
-      format: raw
-      efitype: 4m
-      pre_enrolled_keys: true
+      storage: "{{ pve_template_vm_storage }}"
+      format: "{{ pve_template_vm_storage_format }}"
+      efitype: "{{ '4m' if pve_template_efi_secureboot else '2m' }}"
+      pre_enrolled_keys: "{{ pve_template_efi_secureboot }}"
+    ide:
+      ide2: "{{ pve_template_vm_storage }}:cloudinit,format=raw"
+    ciuser: root
+    cipassword: "{{ pve_template_ci_password }}"
+    sshkeys: "{{ pve_template_ci_ssh_keys }}"
     ipconfig:
       ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
-    scsi:
-      scsi0: ceph-rbd:0,import-from={{ pve_template_disk_image_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1
-    sata:
-      sata0: ceph-rbd:cloudinit,media=cdrom
     scsihw: virtio-scsi-single
-    storage: ceph-rbd
+    storage: "{{ pve_template_vm_storage }}"
+    scsi:
+      scsi0: "{{ pve_template_vm_storage }}:0,import-from={{ pve_template_disk_image_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1"
     boot: order=scsi0;net0
     ostype: l26
     machine: q35
@@ -220,14 +209,28 @@
   when:
     - pve_template_template_type == "qemu"
 
-- name: pve_template_qemu_setup | Grow VM disk to 15GB # noqa command-instead-of-shell no-changed-when run-once
-  ansible.builtin.shell:
-    cmd: qm resize {{ temporary_vm_info.vmid }} scsi0 15G
-  delegate_to: "{{ pve_template_pve_node }}"
-  run_once: true
+- name: pve_template_preinstall | Set VMID for {{ pve_template_temporary_vm_name }}
+  ansible.builtin.set_fact:
+    pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
+  when:
+    - pve_template_template_type == "qemu"
+
+- name: pve_template_preinstall | Print VMID for {{ pve_template_temporary_vm_name }}
+  ansible.builtin.debug:
+    msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
+  when:
+    - pve_template_template_type == "qemu"
+
+- name: pve_template_qemu_setup | Resize disk {{ pve_template_vm_storage }}
+  community.general.proxmox_disk:
+    api_user: "{{ pve_template_api_user }}"
+    api_password: "{{ pve_template_api_password }}"
+    api_host: "{{ pve_template_api_host }}"
+    vmid: "{{ pve_template_temporary_vm_vmid }}"
+    disk: scsi0
+    size: 15G
+    state: resized
   register: temporary_vm_disk_resize
-  timeout: 300
-  until: temporary_vm_disk_resize is not failed
   when:
     - pve_template_template_type == "qemu"
 
@@ -238,33 +241,23 @@
   when:
     - pve_template_template_type == "qemu"
 
-- name: pve_template_preinstall | Set {{ pve_template_temporary_vm_vmid }}
-  ansible.builtin.set_fact:
-    pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
-  when:
-    - pve_template_template_type == "qemu"
-- name: pve_template_preinstall | Print {{ pve_template_temporary_vm_vmid }}
-  ansible.builtin.debug:
-    msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
-  when:
-    - pve_template_template_type == "qemu"
-
-- name: pve_template_qemu_builder | Ensure Static-IP is set for QEMU instance
+- name: pve_template_qemu_builder | Update cloud-init for {{ pve_template_temporary_vm_name }}
   community.general.proxmox_kvm:
     api_user: "{{ pve_template_api_user }}"
     api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
     api_host: "{{ pve_template_api_host }}"
     node: "{{ pve_template_pve_node }}"
     name: "{{ pve_template_temporary_vm_name }}"
     vmid: "{{ pve_template_temporary_vm_vmid }}"
+    ciuser: root
+    cipassword: "{{ pve_template_ci_password }}"
+    sshkeys: "{{ pve_template_ci_ssh_keys }}"
     ipconfig:
       ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
     update: true
-  register: temporary_vm_static_update
+  register: temporary_vm_update
   timeout: 300
-  until: temporary_vm_static_update is not failed
+  until: temporary_vm_update is not failed
   when:
     - pve_template_temporary_vm_vmid is defined
     - pve_template_template_type == "qemu"
@@ -272,17 +265,15 @@
 - name: pve_template_qemu_builder | Run Assertion
   ansible.builtin.include_tasks: pve_handler.yml
   vars:
-    assertion_task: "{{ temporary_vm_static_update }}"
+    assertion_task: "{{ temporary_vm_update }}"
   when:
     - pve_template_temporary_vm_vmid is defined
     - pve_template_template_type == "qemu"
 
-- name: pve_template_qemu_builder | Start temporary QEMU instance
+- name: pve_template_qemu_builder | Start {{ pve_template_temporary_vm_name }}
   community.general.proxmox_kvm:
     api_user: "{{ pve_template_api_user }}"
     api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
     api_host: "{{ pve_template_api_host }}"
     node: "{{ pve_template_pve_node }}"
     name: "{{ pve_template_temporary_vm_name }}"
@@ -306,7 +297,7 @@
 
 - name: pve_template_preinstall | Wait for {{ pve_template_temporary_vm_name }}
   ansible.builtin.wait_for:
-    host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+    host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
     port: 22
     search_regex: OpenSSH
     connect_timeout: 300
@@ -314,7 +305,7 @@
   when:
     - pve_template_template_type == "qemu"
 
-- name: pve_template_preinstall | Add temporary VM to 'template_tmp' group
+- name: pve_template_preinstall | Set 'template_tmp' group for {{ pve_template_temporary_vm_name }}
   ansible.builtin.add_host:
     groups:
       - template_tmp
@@ -395,16 +386,16 @@
     features: fuse=1,mount=ceph;autofs;nfs;cifs,nesting=1
     cores: 2
     memory: 4096
-    storage: ceph-rbd
+    storage: "{{ pve_template_vm_storage }}"
     timezone: host
     pool: Templates
     pubkey: "{{ pve_template_lxc_ssh_pubkey }}"
     disk: 10
     # hookscript: "{{ 'cephfs:snippets/ssh_install.sh' if (pve_template_template_dist_name == 'Rocky') or (pve_template_template_dist_name == 'AlmaLinux') else omit }}"
-    # disk: "ceph-rbd:10,mp=rootfs,acl=0,quota=0,replicate=0,ro=0,size=10G"
+    # disk: ""{{ pve_template_vm_storage }}":10,mp=rootfs,acl=0,quota=0,replicate=0,ro=0,size=10G"
     mounts:
-      mp1: ceph-rbd:10,mp=/opt,size=10G
-      mp2: ceph-rbd:5,mp=/var,size=5G
+      mp1: "{{ pve_template_vm_storage }}:10,mp=/opt,size=10G"
+      mp2: "{{ pve_template_vm_storage }}:5,mp=/var,size=5G"
     unprivileged: false
     swap: 0
     timeout: 300
