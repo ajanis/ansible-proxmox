@@ -2,12 +2,12 @@
 ### LXC POST INSTALL TASKS TO FINISH ANY REMAINING CONFIGURATION AND CREATE THE NEW LXC TEMPLATE
 - name: pve_template_postinstall | Stop temporary LXC instance
   community.general.proxmox:
-    api_user: "{{ pve_template_api_user }}"
-    api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
     hostname: "{{ pve_template_temporary_vm_name }}"
     vmid: "{{ pve_template_temporary_vm_vmid }}"
     state: stopped
@@ -35,13 +35,13 @@
 
 - name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags
   community.general.proxmox:
-    api_user: "{{ pve_template_api_user }}"
-    api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
-    password: "{{ pve_template_ci_password }}"
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
+    password: "{{ pve_guest_password }}"
     hostname: "{{ pve_template_template_name }}"
     vmid: "{{ pve_template_temporary_vm_vmid }}"
     update: true
@@ -75,11 +75,11 @@
 
 - name: pve_template_postinstall | Create LXC template
   community.general.proxmox:
-    api_user: "{{ pve_template_api_user }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
     state: template
     force: true
     hostname: "{{ pve_template_template_name }}"
@@ -125,12 +125,12 @@
 
 - name: pve_template_postinstall | Removing old template
   community.general.proxmox:
-    api_user: "{{ pve_template_api_user }}"
-    api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
     vmid: "{{ pve_template_current_template_vmid }}"
     state: absent
   when:
@@ -156,12 +156,12 @@
 ### QEMU POST-INSTALL TASKS TO FINISH ANY CONFIGURATION AND CREATE NEW QEMU TEMPLATE
 - name: pve_template_postinstall | Stop temporary QEMU instance
   community.general.proxmox_kvm:
-    api_user: "{{ pve_template_api_user }}"
-    api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
     name: "{{ pve_template_temporary_vm_name }}"
     vmid: "{{ pve_template_temporary_vm_vmid }}"
     state: stopped
@@ -189,12 +189,12 @@
 
 - name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags for
   community.general.proxmox_kvm:
-    api_user: "{{ pve_template_api_user }}"
-    api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
     name: "{{ pve_template_template_name }}"
     vmid: "{{ pve_template_temporary_vm_vmid }}"
     pool: Templates
@@ -229,13 +229,13 @@
 
 - name: pve_template_postinstall | Create QEMU template from ID
   community.general.proxmox_kvm:
-    api_user: "{{ pve_template_api_user }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
     name: "{{ pve_template_template_name }}"
     vmid: "{{ pve_template_temporary_vm_vmid }}"
-    node: "{{ pve_template_pve_node }}"
+    node: "{{ pve_node }}"
     template: true
     state: template
   register: template_conversion
@@ -280,12 +280,12 @@
 
 - name: pve_template_postinstall | Removing old template
   community.general.proxmox_kvm:
-    api_user: "{{ pve_template_api_user }}"
-    api_password: "{{ pve_template_api_password }}"
-    api_token_id: "{{ pve_template_api_token_id }}"
-    api_token_secret: "{{ pve_template_api_token_secret }}"
-    api_host: "{{ pve_template_api_host }}"
-    node: "{{ pve_template_pve_node }}"
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_node }}"
     vmid: "{{ pve_template_current_template_vmid }}"
     template: true
     state: absent

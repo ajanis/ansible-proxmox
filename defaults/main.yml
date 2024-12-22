@@ -1,15 +1,15 @@
 ---
 # defaults file for ansible-pve-template
-pve_template_api_host: proxmox-api.local
-pve_template_pve_node: proxmox-pve
-pve_template_api_user: root@pam
-pve_template_api_token_id: "{{ vault_pve_template_api_token_id | mandatory }}"
-pve_template_api_token_secret: "{{ vault_pve_template_api_token_secret | mandatory }}"
-pve_template_api_password: "{{ vault_pve_template_api_password | mandatory }}"
+pve_api_host: proxmox-api.local
+pve_node: proxmox-pve
+pve_api_user: root@pam
+pve_api_token_id: "{{ vault_pve_api_token_id | mandatory }}"
+pve_api_token_secret: "{{ vault_pve_api_token_secret | mandatory }}"
+pve_api_password: "{{ vault_pve_api_password | mandatory }}"
 pve_template_temporary_vm_cidr: 10.0.10.10/24
 pve_template_vm_storage_default_size: 15
 pve_template_ci_user: root
-pve_template_ci_password: "{{ vault_pve_template_ci_password | mandatory }}"
+pve_guest_password: "{{ vault_pve_guest_password | mandatory }}"
 pve_template_template_basedir: /mnt/pve/cephfs/template
 pve_template_iso_directory: "{{ pve_template_template_basedir }}/iso"
 pve_template_lxc_directory: "{{ pve_template_template_basedir }}/cache"
@@ -55,7 +55,7 @@ pve_template_cloud_images:
 
 pve_template_lxc_ssh_pubkey: ""
 
-# vault_pve_template_api_token_secret:
-# vault_pve_template_api_token_id:
-# vault_pve_template_api_password:
-# vault_pve_template_ci_password:
+# vault_pve_api_token_secret:
+# vault_pve_api_token_id:
+# vault_pve_api_password:
+# vault_pve_guest_password:

@@ -2,10 +2,10 @@
 - name: Check mandatory variables are defined
   ansible.builtin.assert:
     that:
-      - pve_template_api_token_secret
-      - pve_template_api_token_id
-      - pve_template_api_password
-      - pve_template_ci_password
+      - pve_api_token_secret
+      - pve_api_token_id
+      - pve_api_password
+      - pve_guest_password
     success_msg: VALUES ARE set
     fail_msg: VALUE is not set.  Create a vault-encrypted value
 
