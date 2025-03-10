@@ -126,9 +126,6 @@
     - virt-customize -a {{ pve_template_disk_image_path }} --install 'vim,bash-completion,wget,curl,unzip,qemu-guest-agent,openssh-server'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'mkdir -p /root/.ssh'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'touch /root/.ssh/authorized_keys'
-    - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/data.mount:/etc/systemd/system/'
-    - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/etc/systemd/system/media.mount:/etc/systemd/system/'
-    - virt-customize -a {{ pve_template_disk_image_path }} --copy-in '/opt/ceph:/opt/'
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: true/disable_root: false/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: True/disable_root: False/'"
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: 1/disable_root: 0/'"
@@ -140,8 +137,6 @@
     - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
     - virt-customize -a {{ pve_template_disk_image_path }} --selinux-relabel
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable data.mount'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable media.mount'
     - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable qemu-guest-agent'
 
 - name: pve_template_qemu_setup | Run Assertion
@@ -161,7 +156,7 @@
     name: "{{ pve_template_temporary_vm_name }}"
     state: present
     autostart: false
-    cpu: host,flags=+md-clear;+pcid;+spec-ctrl;+ssbd;+aes
+    cpu: host,flags=-md-clear;-pcid;-spec-ctrl;-ssbd;+aes
     sockets: 2
     cores: 2
     vcpus: 4
