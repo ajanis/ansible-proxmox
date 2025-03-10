@@ -230,6 +230,7 @@
 - name: pve_template_postinstall | Create QEMU template from ID
   community.general.proxmox_kvm:
     api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
     api_token_id: "{{ pve_api_token_id }}"
     api_token_secret: "{{ pve_api_token_secret }}"
     api_host: "{{ pve_api_host }}"
