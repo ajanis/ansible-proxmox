@@ -11,9 +11,11 @@
 
 - name: Install proxmoxer
   ansible.builtin.apt:
-    name: python3-proxmoxer
+    name: "{{ item }}"
     state: present
-
+  loop:
+    - python3-proxmoxer
+    - libguestfs-tools
 - name: Add pve-template main
   ansible.builtin.include_tasks:
     file: pve_template_{{ 'interactive' if (pve_template_interactive | bool) else 'automated' }}.yml
