@@ -180,7 +180,7 @@
     scsihw: virtio-scsi-single
     storage: "{{ pve_template_vm_storage }}"
     scsi:
-      scsi0: "{{ pve_template_vm_storage }}:0,import-from={{ pve_template_disk_image_path }},backup=0,discard=on,replicate=0,ssd=1,iothread=1"
+      scsi0: "{{ pve_template_vm_storage }}:0,import-from={{ pve_template_disk_image_path }},{{ pve_template_scsi_opts }}"
     boot: order=scsi0;net0
     ostype: l26
     machine: q35

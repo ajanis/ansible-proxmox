@@ -8,6 +8,7 @@ pve_api_token_secret: "{{ vault_pve_api_token_secret | mandatory }}"
 pve_api_password: "{{ vault_pve_api_password | mandatory }}"
 pve_template_temporary_vm_cidr: 10.0.10.10/24
 pve_template_vm_storage_default_size: 15
+pve_template_scsi_opts: "backup=0,discard=off,replicate=0,ssd=0,iothread=1"
 pve_template_ci_user: root
 pve_guest_password: "{{ vault_pve_guest_password | mandatory }}"
 pve_template_template_basedir: /mnt/pve/cephfs/template
