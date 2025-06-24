@@ -1,0 +1,85 @@
+---
+- name: pve_lxc_create | Create a container
+  community.general.proxmox:
+    node: "{{ pve_node }}"
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_user: "{{ pve_api_user }}"
+    api_host: "{{ pve_api_host }}"
+    validate_certs: false
+    password: "{{ pve_guest_password }}"
+    vmid: "{{ vmid }}"
+    hostname: "{{ hostname }}"
+    pubkey: "{{ pve_lxc_public_key }}"
+    ostemplate: "{{ pve_lxc_ostemplate }}"
+    ostype: "{{ pve_lxc_ostype }}"
+    cores: "{{ pve_lxc_cores }}"
+    memory: "{{ pve_lxc_memory }}"
+    swap: "{{ pve_lxc_swap }}"
+    disk_volume:
+      size: 5
+      storage: "{{ pve_lxc_storage }}"
+    mount_volumes:
+      - id: mp0
+        mountpoint: /opt
+        size: 5
+        storage: "{{ pve_lxc_storage }}"
+      - id: mp1
+        mountpoint: /var/log
+        size: 5
+        storage: "{{ pve_lxc_storage }}"
+      - id: mp2
+        mountpoint: /var/lib
+        size: 20
+        storage: "{{ pve_lxc_storage }}"
+    netif:
+      - name: eth0
+        bridge: "{{ pve_lxc_bridge }}"
+        firewall: 1
+        ip: "{{ ip_address }}"
+        gw: "{{ ip_address | ansible.utils.ipaddr('1') }}"
+        mtu: "{{ pve_lxc_mtu }}"
+        type: veth
+    onboot: "{{ pve_lxc_autostart_onboot }}"
+    state: present
+    unprivileged: "{{ pve_lxc_unpriviliged }}"
+    nameserver: "{{ pve_lxc_nameserver }}"
+    searchdomain: "{{ pve_lxc_searchdomain }}"
+    features: "{{ pve_lxc_features }}"
+    tags: "{{ pve_lxc_tags }}"
+  register: lxc_deploy
+  retries: 10
+  until: lxc_deploy is not failed
+
+- name: pve_lxc_create | Run Assertion
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ lxc_deploy }}"
+
+- name: pve_lxc_create | Start the container
+  community.general.proxmox:
+    node: pve01
+    api_password: "{{ pve_api_password }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_user: "{{ pve_api_user }}"
+    api_host: pve04.home.prettybaked.com
+    validate_certs: false
+    vmid: "{{ vmid }}"
+    state: started
+  register: lxc_start
+  retries: 10
+  until: lxc_start is not failed
+
+- name: pve_lxc_create | Run Assertion
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ lxc_start }}"
+
+- name: pve_lxc_create | Set groups for {{ pve_template_temporary_vm_name }}
+  ansible.builtin.add_host:
+    groups: "{{ pve_lxc_tags }}"
+    name: "{{ hostname }}"
+    ansible_host: "{{ ip_address }}"
+    vmid: "{{ vmid }}"

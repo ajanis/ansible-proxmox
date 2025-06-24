@@ -1,0 +1,144 @@
+---
+- name: pve_kvm_create | Create {{ hostname }}
+  community.general.proxmox_kvm:
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    validate_certs: false
+    node: "{{ pve_node }}"
+    target: "{{ dest_node }}"
+    name: "{{ hostname }}"
+    newid: "{{ vmid }}"
+    clone: "{{ pve_kvm_clone }}"
+    full: true
+    state: present
+    timeout: 300
+  register: kvm_deploy
+  retries: 10
+  until: kvm_deploy is not failed
+
+- name: pve_kvm_create | Assert successful deploy for {{ hostname }}
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ kvm_deploy }}"
+
+- name: pve_kvm_create | Create data volume for {{ hostname }}
+  community.general.proxmox_disk:
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    validate_certs: false
+    disk: scsi1
+    state: present
+    name: "{{ hostname }}"
+    vmid: "{{ vmid }}"
+    backup: false
+    cache: writeback
+    storage: "{{ pve_template_vm_storage }}"
+    format: "{{ pve_template_vm_storage_format }}"
+    size: 5
+  register: kvm_data_volume
+  retries: 10
+  until: kvm_data_volume is not failed
+
+- name: pve_kvm_create | Assert successful data disk creation for {{ hostname }}
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ kvm_data_volume }}"
+
+- name: pve_kvm_create | Update {{ hostname }}
+  community.general.proxmox_kvm:
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    # api_token_id: "{{ pve_api_token_id }}"
+    # api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    validate_certs: false
+    node: "{{ dest_node }}"
+    name: "{{ hostname }}"
+    vmid: "{{ vmid }}"
+    ciuser: root
+    cipassword: "{{ pve_guest_password }}"
+    sshkeys: "{{ pve_template_ci_ssh_keys }}"
+    nameservers: "{{ pve_lxc_nameserver }}"
+    searchdomains: "{{ pve_lxc_searchdomain }}"
+    ipconfig:
+      ipconfig0: "ip={{ ip_address ~ '/24' }},gw={{ (ip_address ~ '/24') | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}"
+    hostpci:
+      hostpci0: host=0000:5e:00.0,pcie=1,rombar=1
+    scsi:
+      scsi1:
+        storage: "{{ pve_template_vm_storage }}"
+        size: 5
+        format: "{{ pve_template_vm_storage_format }}"
+        backup: 0
+        discard: 1
+        replicate: 0
+        cache: writeback
+        ssd: 1
+        iothread: 1
+    update: true
+    sockets: 2
+    cores: 4
+    vcpus: 8
+    tags: "{{ pve_kvm_tags }}"
+    memory: 8192
+    timeout: 300
+  register: kvm_update
+  retries: 10
+  until: kvm_update is not failed
+
+- name: pve_kvm_create | Assert cloud-init update for {{ hostname }}
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ kvm_update }}"
+
+# - name: pve_kvm_create | Resize disk
+#   community.general.proxmox_disk:
+#     api_user: "{{ pve_api_user }}"
+#     api_password: "{{ pve_api_password }}"
+#     api_host: "{{ pve_api_host }}"
+#     vmid: "{{ pve_template_temporary_vm_vmid }}"
+#     disk: scsi0
+#     size: "{{ pve_disk_size }}"
+#     state: resized
+#     timeout: 300
+#   register: kvm_disk_resize
+#   retries: 10
+#   until: kvm_disk_resize is not failed
+
+# - name: pve_kvm_create | Run Assertion
+#   ansible.builtin.include_tasks: ../tasks/assert.yml
+#   vars:
+#     assertion_task: "{{ kvm_disk_resize }}"
+
+- name: pve_kvm_create | Start {{ hostname }}
+  community.general.proxmox_kvm:
+    api_user: "{{ pve_api_user }}"
+    api_token_id: "{{ pve_api_token_id }}"
+    api_token_secret: "{{ pve_api_token_secret }}"
+    api_host: "{{ pve_api_host }}"
+    validate_certs: false
+    name: "{{ hostname }}"
+    vmid: "{{ vmid }}"
+    kvm: true
+    state: started
+    timeout: 300
+  register: kvm_start
+  retries: 10
+  until: kvm_start is not failed
+
+- name: pve_kvm_create | Assert start for {{ hostname }}
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ kvm_start }}"
+
+- name: pve_kvm_create | Wait for {{ hostname }}
+  ansible.builtin.wait_for:
+    host: "{{ ip_address | ansible.utils.ipaddr('address') }}"
+    port: 22
+    search_regex: OpenSSH
+    connect_timeout: 300
+    delay: 60

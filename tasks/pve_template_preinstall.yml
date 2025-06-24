@@ -374,8 +374,8 @@
     ostemplate: cephfs:vztmpl/{{ pve_template_disk_image }}
     ostype: auto
     netif:
-      net0: name=eth0,bridge=vmbr0,mtu=9000,firewall=1,gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }},ip={{
-        pve_template_temporary_vm_cidr }},type=veth
+      net0: name=eth0,bridge=vmbr0,mtu=9000,firewall=1,gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')
+        }},ip={{ pve_template_temporary_vm_cidr }},type=veth
     nameserver: 10.0.10.222
     searchdomain: home.prettybaked.com
     features: fuse=1,mount=ceph;autofs;nfs;cifs,nesting=1

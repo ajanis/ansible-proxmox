@@ -1,0 +1,121 @@
+---
+- name: pve-clone | Create {{ pve_template_temporary_vm_name }} # noqa name[prefix]
+  community.general.proxmox_kvm:
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_host: "{{ pve_api_host }}"
+    clone: ubuntu2204-template
+    kvm: true
+    storage: "{{ pve_template_vm_storage }}"
+    format: "{{ pve_template_vm_storage_format }}"
+    node: "{{ pve_node }}"
+    target: "{{ pve_template_pve_dest_node }}"
+    name: "{{ pve_template_temporary_vm_name }}"
+    full: true
+    tags: "{{ pve_template_tags }}"
+    scsi:
+      scsi0: "{{ pve_template_vm_storage }}:{{ pve_disk_size }},format={{ pve_template_vm_storage_format }},backup=0,discard=on,replicate=0,ssd=1,iothread=1"
+    state: present
+    timeout: 300
+  register: temporary_vm_info
+  retries: 10
+  until: temporary_vm_info is not failed
+
+- name: pve-clone | Run Assertion # noqa name[prefix]
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ temporary_vm_info }}"
+
+- name: pve-clone | Set VMID for {{ pve_template_temporary_vm_name }}} # noqa name[prefix]
+  ansible.builtin.set_fact:
+    pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
+
+- name: pve-clone | Print VMID for {{ pve_template_temporary_vm_name }}} # noqa name[prefix]
+  ansible.builtin.debug:
+    msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
+
+- name: pve-clone | Update cloud-init for {{ pve_template_temporary_vm_name }}} # noqa name[prefix]
+  community.general.proxmox_kvm:
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_host: "{{ pve_api_host }}"
+    node: "{{ pve_template_pve_dest_node }}"
+    name: "{{ pve_template_temporary_vm_name }}"
+    vmid: "{{ pve_template_temporary_vm_vmid }}"
+    ciuser: root
+    cipassword: "{{ pve_guest_password }}"
+    sshkeys: "{{ pve_template_ci_ssh_keys }}"
+    ipconfig:
+      ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
+    update: true
+    sockets: 1
+    cores: 4
+    vcpus: 4
+    full: true
+    memory: 4096
+    tags: "{{ pve_template_tags }}"
+    balloon: 0
+    timeout: 300
+  register: temporary_vm_update
+  retries: 10
+  until: temporary_vm_update is not failed
+
+- name: pve-clone | Run Assertion} # noqa name[prefix]
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ temporary_vm_update }}"
+
+- name: pve-clone | Resize disk} # noqa name[prefix]
+  community.general.proxmox_disk:
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_host: "{{ pve_api_host }}"
+    vmid: "{{ pve_template_temporary_vm_vmid }}"
+    disk: scsi0
+    size: "{{ pve_disk_size }}"
+    state: resized
+    timeout: 300
+  register: temporary_vm_disk_resize
+  retries: 10
+  until: temporary_vm_disk_resize is not failed
+
+- name: pve-clone | Run Assertion} # noqa name[prefix]
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ temporary_vm_disk_resize }}"
+
+- name: pve-clone | Start {{ pve_template_temporary_vm_name }}} # noqa name[prefix]
+  community.general.proxmox_kvm:
+    api_user: "{{ pve_api_user }}"
+    api_password: "{{ pve_api_password }}"
+    api_host: "{{ pve_api_host }}"
+    name: "{{ pve_template_temporary_vm_name }}"
+    vmid: "{{ pve_template_temporary_vm_vmid }}"
+    kvm: true
+    state: started
+    timeout: 300
+  register: temporary_vm_start
+  retries: 10
+  until: temporary_vm_start is not failed
+
+- name: pve-clone | Run Assertion} # noqa name[prefix]
+  ansible.builtin.include_tasks: pve_handler.yml
+  vars:
+    assertion_task: "{{ temporary_vm_start }}"
+
+- name: pve-clone | Wait for {{ pve_template_temporary_vm_name }}
+  ansible.builtin.wait_for:
+    host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+    port: 22
+    search_regex: OpenSSH
+    connect_timeout: 300
+    delay: 60
+
+- name: pve-clone | Set 'docker' group for {{ pve_template_temporary_vm_name }}
+  ansible.builtin.add_host:
+    groups:
+      - docker
+    pve_template_temporary_vm_name: "{{ pve_template_temporary_vm_name }}"
+    name: "{{ pve_template_temporary_vm_name }}"
+    ansible_host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+    pve_template_temporary_vm_vmid: "{{ pve_template_temporary_vm_vmid }}"

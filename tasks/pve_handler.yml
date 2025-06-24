@@ -1,5 +1,5 @@
 ---
-- name: pve_handler | Verify {{ assertion_task }}
+- name: Assert {{ assertion_task }}
   ansible.builtin.assert:
     fail_msg: |
       Failed: {{ assertion_task.msg }}
