@@ -1,4 +1,9 @@
 ---
+- name: Run tasks against proxmox template_builder host
+  when:
+    - inventory_hostname in groups['template_builder']
+  block:
+
 - name: pve_template_automated | Set Template Type
   ansible.builtin.set_fact:
     pve_template_template_type: "{{ 'lxc' if pve_template_template_type == 'lxc' else 'qemu' }}"
