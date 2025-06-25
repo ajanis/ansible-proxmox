@@ -1,0 +1,45 @@
+---
+- name: Set new vm information
+  when:
+    - inventory_hostname in groups['template_builder']
+  block:
+    - name: Prompt for new VM 'hostname'
+      ansible.builtin.pause:
+        prompt: |
+          Enter the 'hostname' for the new VM
+      register: pve_name_selection
+
+    - name: Prompt for new VM 'ip/network' CIDR
+      ansible.builtin.pause:
+        prompt: |
+          Enter the 'ip/network' CIDR for new VM:
+      register: pve_cidr_selection
+
+    - name: Prompt for destination PVE node
+      ansible.builtin.pause:
+        prompt: |
+          Enter the PVE destination 'hypervisor' node:
+      register: pve_node_selection
+
+    - name: Prompt for new VM 'host groups'
+      ansible.builtin.pause:
+        prompt: |
+          Enter the new VM 'groups' (comma separated)
+      register: pve_group_selection
+
+    - name: Set VM facts
+      ansible.builtin.set_fact:
+        pve_template_temporary_vm_name: "{{ pve_name_selection.user_input }}"
+        pve_template_pve_dest_node: "{{ pve_node_selection.user_input }}"
+        pve_template_temporary_vm_cidr: "{{ pve_cidr_selection.user_input }}"
+        pve_template_tags: |
+          {%- set ns = namespace(tags=[]) -%}
+          {%- set ns.tags = ['ubuntu', 'kvm', 'telegraf'] -%}
+          {%- for tag in (pve_group_selection.user_input | split(',')) -%}
+          {%- set ns.tags = ns.tags + [tag] -%}
+          {%- endfor -%}
+          {{ ns.tags }}
+
+    - name: Include 'pve-clone.yml' tasks
+      ansible.builtin.include_tasks:
+        file: pve-clone.yml
