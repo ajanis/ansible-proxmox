@@ -1,25 +1,261 @@
 ---
-- name: Check mandatory variables are defined
-  ansible.builtin.assert:
-    that:
-      - pve_api_token_secret
-      - pve_api_token_id
-      - pve_api_password
-      - pve_guest_password
-    success_msg: VALUES ARE set
-    fail_msg: VALUE is not set.  Create a vault-encrypted value
+- name: Tune sysctl settings
+  ansible.posix.sysctl:
+    state: present
+    reload: true
+    sysctl_file: /etc/sysctl.conf
+    sysctl_set: true
+  args: "{{ item }}"
+  loop: "{{ sysctl_settings }}"
+  tags:
+    - sysctlS
 
-- name: Install proxmoxer
+- name: Install proxmoxer and libguestfs-tools
   ansible.builtin.apt:
     name: "{{ item }}"
     state: present
   loop:
     - python3-proxmoxer
     - libguestfs-tools
-- name: Add pve-template main
-  ansible.builtin.include_tasks:
-    file: pve_template_{{ 'interactive' if (pve_template_interactive | bool) else 'automated' }}.yml
 
-- name: Run preinstall tasks
-  ansible.builtin.include_tasks:
-    file: pve_template_preinstall.yml
+- name: Include 'copyfiles' from 'common'
+  ansible.builtin.include_role:
+    name: common
+    tasks_from: copyfiles
+  vars:
+    common_config_files: "{{ config_files }}"
+    common_directories: "{{ directories }}"
+    common_rm_files: "{{ rm_files }}"
+
+- name: Include base roles
+  ansible.builtin.include_role:
+    name: "{{ item }}"
+  loop:
+    - common
+    - ceph-fs
+    - rsyslog
+    - telegraf
+
+- name: Ask user if this is a new driver install or an upgrade/reinstall
+  tags:
+    - vgpu-driver
+  block:
+    - name: Prompt user for 'new' install or 'upgrade/reinstall' of nVidia drivers and kernel modules
+      ansible.builtin.pause:
+        prompt: |
+          Is this a [1] New Driver Installation? or [2] Driver Update / Driver Re-Installation
+          -------------------------------------------------
+          [1] : New Driver Installation
+          [2] : Driver Update or Driver Re-Installation
+          -------------------------------------------------
+      register: driver_install_selection
+
+    - name: Set installation type
+      ansible.builtin.set_fact:
+        driver_type_installation: "{{ 'new' if driver_install_selection.user_input == '1' else 'update' }}"
+      register: driver_install_type_set
+      when:
+        - driver_install_selection is defined
+        - driver_install_selection != None
+
+    - name: Print Driver Install Selection
+      ansible.builtin.debug:
+        var: driver_type_installation
+      when:
+        - driver_install_type_set.changed
+
+- name: Remove existing nVidia drivers and configurations
+  when:
+    - driver_type_installation == "update"
+  block:
+    - name: Remove nVidia Driver
+      ansible.builtin.apt:
+        name:
+          - nvidia-driver
+        state: absent
+        force: true
+      notify: Reboot System
+
+    - name: Purge *nvidia*
+      ansible.builtin.apt:
+        name:
+          - "*nvidia*"
+        state: absent
+        force: true
+      notify: Reboot System
+
+    - name: Autoremove packages and clean repos
+      ansible.builtin.apt:
+        autoremove: true
+        clean: true
+    # - name: Remove nouveau module from blacklist
+    #   community.general.kernel_blacklist:
+    #     name: nouveau
+    #     blacklist_file: /etc/modprobe.d/blacklist.conf
+    #     state: absent
+
+- name: Run Apt repository and package tasks
+  tags:
+    - vgpu-driver
+    - apt
+  block:
+    - name: Include apt tasks from common
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: packages-debian
+      vars:
+        common_apt_repos: "{{ apt_repos }}"
+        common_apt_pkgs: "{{ apt_pkgs }}"
+
+    - name: Set GCC Compiler to GCC-12
+      community.general.alternatives:
+        name: cc
+        path: /usr/bin/gcc
+        link: /usr/bin/cc
+        state: selected
+
+- name: VGPU Unlocker Tasks
+  tags:
+    - vgpu-driver
+    - vgpu-unlock
+  block:
+    - name: Clone git repositories
+      ansible.builtin.git:
+        clone: true # noqa latest
+        version: HEAD
+      args: "{{ item }}"
+      loop: "{{ git_repos }}"
+
+    - name: Download Rust Compiler Installer Script
+      ansible.builtin.get_url:
+        url: https://sh.rustup.rs
+        dest: /opt/sh.rustup.rs
+        mode: "0755"
+
+    - name: Install Rust Compiler
+      ansible.builtin.shell:
+        cmd: /opt/sh.rustup.rs -y --profile minimal
+        creates: /root/.cargo/bin/rustup
+        executable: /bin/bash
+
+    - name: Build the vGPU Unlocker
+      ansible.builtin.shell:
+        cmd: source /root/.cargo/env && cargo build --release
+        chdir: /opt/vgpu_unlock-rs/
+        executable: /bin/bash
+        creates: /opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so
+
+- name: Update Bootloader and Kernel Modules
+  tags:
+    - vgpu-driver
+    - vgpu-iommu
+  block:
+    - name: Check boot mode
+      ansible.builtin.stat:
+        path: /etc/kernel/proxmox-boot-uuids
+      register: zfs_boot_check
+
+    - name: Get Serial device
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: serial-console
+
+    - name: Ensure IOMMU Enabled for Grub installations
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: grub-config
+      vars:
+        common_grub_configs: "{{ grub_configs }}"
+      when:
+        - not zfs_boot_check.stat.exists
+
+    - name: Ensure IOMMU Enabled for ZFS Root installations
+      ansible.builtin.lineinfile:
+        path: /etc/kernel/cmdline
+        regexp: "^root=ZFS.*$"
+        line: "root=ZFS=rpool/ROOT/pve-1 boot=zfs intel_iommu=on console={{ 'ttyS' ~ serial_tty_device | default('ttyS0') }},115200 console={{ 'tty' ~ console_tty_device
+          | default('tty1') }}"
+      notify:
+        - Proxmox Boot Tool Refresh
+      when:
+        - zfs_boot_check.stat.exists
+
+    - name: Configure Imported and Blacklisted Kernel modules
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kernel-modules
+      vars:
+        common_blacklist_kernel_modules: "{{ blacklist_kernel_modules }}"
+        common_kernel_modules: "[]"
+
+    - name: Flush handlers
+      ansible.builtin.meta: flush_handlers
+
+- name: Patch and install nVidia vGPU Driver
+  tags:
+    - vgpu-driver
+    - vgpu-patch
+  block:
+    - name: Copy Patched nVidia Driver Script
+      ansible.builtin.copy:
+        dest: /opt/{{ nvidia_host_driver }}
+        src: /data/nvidia_vgpu/host_drivers/{{ nvidia_host_driver }}
+        mode: "0777"
+        remote_src: true
+      register: nvidia_driver_copy
+      notify: Run NVidia Driver Script
+
+    - name: Run nVidia Driver Build Script
+      ansible.builtin.shell:
+        cmd: ./{{ nvidia_host_driver }} -s -a --dkms -m=kernel
+        chdir: /opt
+        executable: /bin/bash
+      register: nvidia_driver_update
+      environment:
+        CC: /usr/bin/gcc-12
+      changed_when:
+        - nvidia_driver_update is success
+      when:
+        - build_nvidia_driver | default(true)
+      notify:
+        - Reboot System
+    - name: Configure Imported and Blacklisted Kernel modules
+      ansible.builtin.include_role:
+        name: common
+        tasks_from: kernel-modules
+      vars:
+        common_blacklist_kernel_modules: "{{ whitelist_kernel_modules }}"
+        common_kernel_modules: "{{ kernel_modules }}"
+    - name: Flush handlers
+      ansible.builtin.meta: flush_handlers
+
+- name: Validate mediate device presence
+  tags:
+    - vgpu-mdev
+  block:
+    - name: Gather mdevctl Types
+      ansible.builtin.command:
+        cmd: mdevctl types
+      register: mdevctl_types
+      when: not ansible_check_mode
+      changed_when:
+        - mdevctl_types.rc == 0
+        - mdevctl_types.stdout | default(None) is not none
+      tags:
+        - mdevctl
+
+    - name: Debug Print mdevctl Types
+      ansible.builtin.debug:
+        var: mdevctl_types.stdout
+      when:
+        - mdevctl_types.stdout | default(None) is not none
+      tags:
+        - mdevctl
+    - name: Assert Mediated Device Types Exist
+      ansible.builtin.assert:
+        that:
+          - "{{ mdevctl_types.stdout | default(None) is not none }}"
+      when:
+        - mdevctl_types.stdout | default(None) is not none
+      tags:
+        - mdevctl

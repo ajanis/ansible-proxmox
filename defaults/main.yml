@@ -19,8 +19,8 @@ pve_template_cloud_images:
   rocky9:
     dist_name: Rocky
     dist_release: 9
-    dist_checksum: sha256:{{ lookup('ansible.builtin.url', 'https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2.CHECKSUM')
-      | regex_search('[a-f|0-9]{64}') }}
+    dist_checksum: sha256:{{ lookup('ansible.builtin.url',
+      'https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2.CHECKSUM') | regex_search('[a-f|0-9]{64}') }}
     dist_arch: x86_64
     dist_url: https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud.latest.x86_64.qcow2
     lxc_url: http://download.proxmox.com/images/system/rockylinux-9-default_20221109_amd64.tar.xz
@@ -34,8 +34,8 @@ pve_template_cloud_images:
   centos9:
     dist_name: CentOS
     dist_release: 9-Stream
-    dist_checksum: sha256:{{ lookup('ansible.builtin.url', 'https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2.SHA256SUM')
-      | regex_search('[a-f|0-9]{64}') }}
+    dist_checksum: sha256:{{ lookup('ansible.builtin.url',
+      'https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2.SHA256SUM') | regex_search('[a-f|0-9]{64}') }}
     dist_arch: x86_64
     dist_url: https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2
     lxc_url: http://download.proxmox.com/images/system/centos-9-stream-default_20221109_amd64.tar.xz
