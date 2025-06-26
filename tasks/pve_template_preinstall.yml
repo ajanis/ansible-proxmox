@@ -1,6 +1,4 @@
 ---
-### THESE TASKS RUN AGAINST BOTH HOSTS HOWEVER THE COLLECTED INFORMATION WILL BE COLLECTED FOR ONLY THE RELEVANT TEMPLATE TYPE
-### COLLECT THE TEMPLATE INFOIRMATION FOR THE CORRESPONDING OS AND TEMPLATE TYPE SELECTED
 - name: pve_template_preinstall | Retrieve template info
   community.general.proxmox_vm_info:
     api_user: "{{ pve_api_user }}"
@@ -37,456 +35,385 @@
   when:
     - pve_template_current_template_vmid is defined
 
-### THESE SETUP TASKS WILL CONFIGURE  TEMPORARY GUEST INSTANCE THAT WILL BE CONFIGURED AND USED TO CREATE THE NEW TEMPLATE
-### THEY RUN AGAINST BOTH QEMU AND LXC HOST TYPES BUT THE CONDITIONS WILL ENSURE THAT ONLY THE CORRECT INSTANCE TYPE
-### SO THE SINGLE-TYPE TASKS WILL RECEIVE ONLY THE CORRECT INFO TO OPERATE ON
-
-### QEMU SETUP TASKS TO CREATE A TEMPORARY GUEST
-
-- name: pve_template_qemu_setup | Set facts for source image
-  ansible.builtin.set_fact:
-    pve_template_template_name: "{{ pve_template_selected_template.key }}-template"
-    pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-template-builder"
-    pve_template_cloud_image_url: "{{ pve_template_selected_template.value.dist_url }}"
-    pve_template_cloud_image: "{{ pve_template_selected_template.value.dist_url | basename }}"
-    pve_template_disk_image: "{{ (pve_template_selected_template.value.dist_url | basename) | regex_replace('(^.*)\\..+$', '\\1.img') }}"
-    pve_template_checksum: "{{ pve_template_selected_template.value.dist_checksum }}"
-
+- name: pve_template_preinstall | Run pre-install tasks for QEMU instances
   when:
     - pve_template_template_type == "qemu"
+  block:
+    - name: pve_template_qemu_setup | Set facts for source image
+      ansible.builtin.set_fact:
+        pve_template_template_name: "{{ pve_template_selected_template.key }}-template"
+        pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-template-builder"
+        pve_template_cloud_image_url: "{{ pve_template_selected_template.value.dist_url }}"
+        pve_template_cloud_image: "{{ pve_template_selected_template.value.dist_url | basename }}"
+        pve_template_disk_image: "{{ (pve_template_selected_template.value.dist_url | basename) | regex_replace('(^.*)\\..+$', '\\1.img') }}"
+        pve_template_checksum: "{{ pve_template_selected_template.value.dist_checksum }}"
 
-- name: pve_template_qemu_setup | Set facts for working disk image
-  ansible.builtin.set_fact:
-    pve_template_cloud_image_path: /tmp/source_{{ pve_template_cloud_image }}
-    pve_template_disk_image_path: /tmp/{{ pve_template_disk_image }}
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Set facts for working disk image
+      ansible.builtin.set_fact:
+        pve_template_cloud_image_path: /tmp/source_{{ pve_template_cloud_image }}
+        pve_template_disk_image_path: /tmp/{{ pve_template_disk_image }}
 
-- name: pve_template_qemu_setup | Print facts for new template
-  ansible.builtin.debug:
-    msg: |
-      Template Name: {{ pve_template_template_name }}
-      Download URL: {{ pve_template_cloud_image_url }}
-      Temporary VM Name: {{ pve_template_temporary_vm_name }}
-      Cloud Image Checksum: {{ pve_template_checksum }}
-      Cloud Image: {{ pve_template_cloud_image_path }}
-      Raw Image: {{ pve_template_disk_image_path }}
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Print facts for new template
+      ansible.builtin.debug:
+        msg: |
+          Template Name: {{ pve_template_template_name }}
+          Download URL: {{ pve_template_cloud_image_url }}
+          Temporary VM Name: {{ pve_template_temporary_vm_name }}
+          Cloud Image Checksum: {{ pve_template_checksum }}
+          Cloud Image: {{ pve_template_cloud_image_path }}
+          Raw Image: {{ pve_template_disk_image_path }}
 
-- name: pve_template_qemu_setup | Download cloud image
-  ansible.builtin.get_url:
-    url: "{{ pve_template_cloud_image_url }}"
-    dest: "{{ pve_template_cloud_image_path }}"
-    tmp_dest: /tmp/
-    checksum: "{{ pve_template_checksum }}"
-    mode: "0744"
-  register: cloud_image_download
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Download cloud image
+      ansible.builtin.get_url:
+        url: "{{ pve_template_cloud_image_url }}"
+        dest: "{{ pve_template_cloud_image_path }}"
+        tmp_dest: /tmp/
+        checksum: "{{ pve_template_checksum }}"
+        mode: "0744"
+      register: cloud_image_download
 
-- name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ cloud_image_download }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - cloud_image_download is changed
+    - name: pve_template_qemu_setup | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ cloud_image_download }}"
 
-- name: pve_template_qemu_setup | Convert image to raw
-  ansible.builtin.command:
-    cmd: qemu-img convert -f qcow2 -O raw {{ pve_template_cloud_image_path }} {{ pve_template_disk_image_path }}
-  register: image_conversion
-  changed_when: image_conversion is defined
-  when:
-    - pve_template_template_type == "qemu"
-    - cloud_image_download is changed
+    - name: pve_template_qemu_setup | Convert image to raw
+      ansible.builtin.command:
+        cmd: qemu-img convert -f qcow2 -O raw {{ pve_template_cloud_image_path }} {{ pve_template_disk_image_path }}
+      register: image_conversion
+      changed_when: image_conversion is defined
+      when:
+        - cloud_image_download is changed
 
-- name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ image_conversion }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - image_conversion is changed
+    - name: pve_template_qemu_setup | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ image_conversion }}"
 
-- name: pve_template_qemu_setup | Run libguestfs commands against image
-  ansible.builtin.command:
-    cmd: "{{ pve_template_libguestfs_command }}"
-  register: libguestfs_commands
-  when:
-    - image_conversion is changed
-    - pve_template_template_type == "qemu"
-  changed_when:
-    - libguestfs_commands is defined
-  loop_control:
-    loop_var: pve_template_libguestfs_command
-  loop:
-    - virt-customize -a {{ pve_template_disk_image_path }} --root-password 'password:tmpRootPass'
-    - virt-customize -a {{ pve_template_disk_image_path }} --install 'vim,bash-completion,wget,curl,unzip,qemu-guest-agent,openssh-server'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'mkdir -p /root/.ssh'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'touch /root/.ssh/authorized_keys'
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: true/disable_root: false/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: True/disable_root: False/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: 1/disable_root: 0/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: True/lock_passwd: False/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: true/lock_passwd: false/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: 1/lock_passwd: 0/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: False/ssh_pwauth: True/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: false/ssh_pwauth: true/'"
-    - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
-    - virt-customize -a {{ pve_template_disk_image_path }} --selinux-relabel
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
-    - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable qemu-guest-agent'
+    - name: pve_template_qemu_setup | Run libguestfs commands against image
+      ansible.builtin.command:
+        cmd: "{{ pve_template_libguestfs_command }}"
+      register: libguestfs_commands
+      when:
+        - image_conversion is changed
+      changed_when:
+        - libguestfs_commands is defined
+      loop_control:
+        loop_var: pve_template_libguestfs_command
+      loop:
+        - virt-customize -a {{ pve_template_disk_image_path }} --root-password 'password:tmpRootPass'
+        - virt-customize -a {{ pve_template_disk_image_path }} --install 'vim,bash-completion,wget,curl,unzip,qemu-guest-agent,openssh-server'
+        - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'mkdir -p /root/.ssh'
+        - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'touch /root/.ssh/authorized_keys'
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: true/disable_root: false/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: True/disable_root: False/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/disable_root: 1/disable_root: 0/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: True/lock_passwd: False/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: true/lock_passwd: false/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/lock_passwd: 1/lock_passwd: 0/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: False/ssh_pwauth: True/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: false/ssh_pwauth: true/'"
+        - "virt-edit -a {{ pve_template_disk_image_path }} /etc/cloud/cloud.cfg -e 's/ssh_pwauth: 0/ssh_pwauth: 1/'"
+        - virt-customize -a {{ pve_template_disk_image_path }} --selinux-relabel
+        - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl daemon-reload'
+        - virt-customize -a {{ pve_template_disk_image_path }} --run-command 'systemctl enable qemu-guest-agent'
 
-- name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ libguestfs_commands }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - libguestfs_commands is changed
+    - name: pve_template_qemu_setup | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ libguestfs_commands }}"
 
-- name: pve_template_qemu_setup | Create {{ pve_template_temporary_vm_name }}
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    name: "{{ pve_template_temporary_vm_name }}"
-    state: present
-    autostart: false
-    cpu: host,flags=-md-clear;-pcid;-spec-ctrl;-ssbd;+aes
-    sockets: 2
-    cores: 2
-    vcpus: 4
-    memory: 4096
-    balloon: 0
-    numa_enabled: true
-    net:
-      net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
-    efidisk0:
-      storage: "{{ pve_template_vm_storage }}"
-      format: "{{ pve_template_vm_storage_format }}"
-      efitype: "{{ '4m' if pve_template_efi_secureboot else '2m' }}"
-      pre_enrolled_keys: "{{ pve_template_efi_secureboot }}"
-    ide:
-      ide2: "{{ pve_template_vm_storage }}:cloudinit,format=raw"
-    ciuser: root
-    cipassword: "{{ pve_guest_password }}"
-    sshkeys: "{{ pve_template_ci_ssh_keys }}"
-    ipconfig:
-      ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
-    scsihw: virtio-scsi-single
-    storage: "{{ pve_template_vm_storage }}"
-    scsi:
-      scsi0: "{{ pve_template_vm_storage }}:0,import-from={{ pve_template_disk_image_path }},{{ pve_template_scsi_opts }}"
-    boot: order=scsi0;net0
-    ostype: l26
-    machine: q35
-    bios: ovmf
-    acpi: true
-    hotplug: disk,network,usb,memory,cpu,cloudinit
-    kvm: true
-    agent: enabled=1,fstrim_cloned_disks=1
-    pool: Templates
-    timeout: 300
-  register: temporary_vm_info
-  timeout: 300
-  until: temporary_vm_info is not failed
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Create {{ pve_template_temporary_vm_name }}
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        name: "{{ pve_template_temporary_vm_name }}"
+        state: present
+        autostart: false
+        cpu: host,flags=-md-clear;-pcid;-spec-ctrl;-ssbd;+aes
+        sockets: 2
+        cores: 2
+        vcpus: 4
+        memory: 4096
+        balloon: 0
+        numa_enabled: true
+        net:
+          net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
+        efidisk0:
+          storage: "{{ pve_template_vm_storage }}"
+          format: "{{ pve_template_vm_storage_format }}"
+          efitype: "{{ '4m' if pve_template_efi_secureboot else '2m' }}"
+          pre_enrolled_keys: "{{ pve_template_efi_secureboot }}"
+        ide:
+          ide2: "{{ pve_template_vm_storage }}:cloudinit,format=raw"
+        ciuser: root
+        cipassword: "{{ pve_guest_password }}"
+        sshkeys: "{{ pve_template_ci_ssh_keys }}"
+        ipconfig:
+          ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')
+            }}
+        scsihw: virtio-scsi-single
+        storage: "{{ pve_template_vm_storage }}"
+        scsi:
+          scsi0: "{{ pve_template_vm_storage }}:0,import-from={{ pve_template_disk_image_path }},{{ pve_template_scsi_opts }}"
+        boot: order=scsi0;net0
+        ostype: l26
+        machine: q35
+        bios: ovmf
+        acpi: true
+        hotplug: disk,network,usb,memory,cpu,cloudinit
+        kvm: true
+        agent: enabled=1,fstrim_cloned_disks=1
+        pool: Templates
+        timeout: 300
+      register: temporary_vm_info
+      timeout: 300
+      until: temporary_vm_info is not failed
 
-- name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_info }}"
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_info }}"
 
-- name: pve_template_preinstall | Set VMID for {{ pve_template_temporary_vm_name }}
-  ansible.builtin.set_fact:
-    pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_preinstall | Set VMID for {{ pve_template_temporary_vm_name }}
+      ansible.builtin.set_fact:
+        pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
 
-- name: pve_template_preinstall | Print VMID for {{ pve_template_temporary_vm_name }}
-  ansible.builtin.debug:
-    msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_preinstall | Print VMID for {{ pve_template_temporary_vm_name }}
+      ansible.builtin.debug:
+        msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
 
-- name: pve_template_qemu_setup | Resize disk {{ pve_template_vm_storage }}
-  community.general.proxmox_disk:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_host: "{{ pve_api_host }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    disk: scsi0
-    size: 15G
-    state: resized
-  register: temporary_vm_disk_resize
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Resize disk {{ pve_template_vm_storage }}
+      community.general.proxmox_disk:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_host: "{{ pve_api_host }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        disk: scsi0
+        size: 15G
+        state: resized
+      register: temporary_vm_disk_resize
 
-- name: pve_template_qemu_setup | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_disk_resize }}"
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_setup | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_disk_resize }}"
 
-- name: pve_template_qemu_builder | Update cloud-init for {{ pve_template_temporary_vm_name }}
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    name: "{{ pve_template_temporary_vm_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    ciuser: root
-    cipassword: "{{ pve_guest_password }}"
-    sshkeys: "{{ pve_template_ci_ssh_keys }}"
-    ipconfig:
-      ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}
-    update: true
-  register: temporary_vm_update
-  timeout: 300
-  until: temporary_vm_update is not failed
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_builder | Update cloud-init for {{ pve_template_temporary_vm_name }}
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        name: "{{ pve_template_temporary_vm_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        ciuser: root
+        cipassword: "{{ pve_guest_password }}"
+        sshkeys: "{{ pve_template_ci_ssh_keys }}"
+        ipconfig:
+          ipconfig0: ip={{ pve_template_temporary_vm_cidr }},gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')
+            }}
+        update: true
+      register: temporary_vm_update
+      timeout: 300
+      until: temporary_vm_update is not failed
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_builder | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_update }}"
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_builder | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_update }}"
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_builder | Start {{ pve_template_temporary_vm_name }}
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    name: "{{ pve_template_temporary_vm_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    kvm: true
-    state: started
-  register: temporary_vm_start
-  timeout: 300
-  until: temporary_vm_start is not failed
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_builder | Start {{ pve_template_temporary_vm_name }}
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        name: "{{ pve_template_temporary_vm_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        kvm: true
+        state: started
+      register: temporary_vm_start
+      timeout: 300
+      until: temporary_vm_start is not failed
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_qemu_builder | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_start }}"
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "qemu"
+    - name: pve_template_qemu_builder | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_start }}"
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_preinstall | Wait for {{ pve_template_temporary_vm_name }}
-  ansible.builtin.wait_for:
-    host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
-    port: 22
-    search_regex: OpenSSH
-    connect_timeout: 300
-    delay: 60
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_preinstall | Wait for {{ pve_template_temporary_vm_name }}
+      ansible.builtin.wait_for:
+        host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+        port: 22
+        search_regex: OpenSSH
+        connect_timeout: 300
+        delay: 60
 
-- name: pve_template_preinstall | Set 'template_tmp' group for {{ pve_template_temporary_vm_name }}
-  ansible.builtin.add_host:
-    groups:
-      - template_tmp
-    pve_template_temporary_vm_name: "{{ pve_template_temporary_vm_name }}"
-    name: "{{ pve_template_temporary_vm_name }}"
-    ansible_host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
-    # ansible_python_interpreter: /usr/bin/env python3
-    pve_template_temporary_vm_vmid: "{{ pve_template_temporary_vm_vmid }}"
-    pve_template_template_type: "{{ pve_template_template_type }}"
-  when:
-    - pve_template_template_type == "qemu"
+    - name: pve_template_preinstall | Set 'template_tmp' group for {{ pve_template_temporary_vm_name }}
+      ansible.builtin.add_host:
+        groups:
+          - template_tmp
+        pve_template_temporary_vm_name: "{{ pve_template_temporary_vm_name }}"
+        name: "{{ pve_template_temporary_vm_name }}"
+        ansible_host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+        # ansible_python_interpreter: /usr/bin/env python3
+        pve_template_temporary_vm_vmid: "{{ pve_template_temporary_vm_vmid }}"
+        pve_template_template_type: "{{ pve_template_template_type }}"
 
-### LXC BUILDER TASKS
-## LXC SETUP TASKS TO CREATE A TEMPORARY INSTANCE
-
-- name: pve_template_lxc_setup | Set facts for new template
-  ansible.builtin.set_fact:
-    pve_template_template_name: "{{ pve_template_selected_template.key }}-lxc-template"
-    pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-lxc-template-builder"
-    pve_template_cloud_image_url: "{{ pve_template_selected_template.value.lxc_url }}"
-    pve_template_disk_image: "{{ pve_template_selected_template.value.lxc_url | basename }}"
-    pve_template_disk_image_path: "{{ pve_template_lxc_directory }}/{{ pve_template_selected_template.value.lxc_url | basename }}"
-    pve_template_template_dist_name: "{{ pve_template_selected_template.value.dist_name }}"
+- name: pve_template_preinstall | Run pre-install tasks for QEMU instances
   when:
     - pve_template_template_type == "lxc"
+  block:
+    - name: pve_template_lxc_setup | Set facts for new template
+      ansible.builtin.set_fact:
+        pve_template_template_name: "{{ pve_template_selected_template.key }}-lxc-template"
+        pve_template_temporary_vm_name: "{{ pve_template_selected_template.key }}-lxc-template-builder"
+        pve_template_cloud_image_url: "{{ pve_template_selected_template.value.lxc_url }}"
+        pve_template_disk_image: "{{ pve_template_selected_template.value.lxc_url | basename }}"
+        pve_template_disk_image_path: "{{ pve_template_lxc_directory }}/{{ pve_template_selected_template.value.lxc_url | basename }}"
+        pve_template_template_dist_name: "{{ pve_template_selected_template.value.dist_name }}"
 
-- name: pve_template_lxc_setup | Print facts for new template
-  ansible.builtin.debug:
-    msg: |
-      Template Name: {{ pve_template_template_name }}
-      Download URL: {{ pve_template_cloud_image_url }}
-      Temporary VM Name: {{ pve_template_temporary_vm_name }}
-      Distribution: {{ pve_template_template_dist_name }}
-      LXC Template: {{ pve_template_disk_image_path }}
-  when:
-    - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_setup | Print facts for new template
+      ansible.builtin.debug:
+        msg: |
+          Template Name: {{ pve_template_template_name }}
+          Download URL: {{ pve_template_cloud_image_url }}
+          Temporary VM Name: {{ pve_template_temporary_vm_name }}
+          Distribution: {{ pve_template_template_dist_name }}
+          LXC Template: {{ pve_template_disk_image_path }}
 
-- name: pve_template_lxc_setup | Download cloud image
-  ansible.builtin.get_url:
-    url: "{{ pve_template_cloud_image_url }}"
-    dest: /mnt/pve/cephfs/template/cache/
-    mode: "0744"
-  register: cloud_image_download
-  when:
-    - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_setup | Download cloud image
+      ansible.builtin.get_url:
+        url: "{{ pve_template_cloud_image_url }}"
+        dest: /mnt/pve/cephfs/template/cache/
+        mode: "0744"
+      register: cloud_image_download
 
-- name: pve_template_qemu_builder | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ cloud_image_download }}"
-  when:
-    - cloud_image_download is defined
-    - pve_template_template_type == "lxc"
+    - name: pve_template_qemu_builder | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ cloud_image_download }}"
+      when:
+        - cloud_image_download is defined
 
-# - name: pve_template_lxc_setup | Print download details
-#   ansible.builtin.debug:
-#     msg: "{{ cloud_image_download }}"
-#     verbosity: 1
-#   when:
-#     - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_setup | Create template-builder container
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        state: present
+        password: "{{ pve_guest_password }}"
+        hostname: "{{ pve_template_temporary_vm_name }}"
+        ostemplate: cephfs:vztmpl/{{ pve_template_disk_image }}
+        ostype: auto
+        netif:
+          net0: name=eth0,bridge=vmbr0,mtu=9000,firewall=1,gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')
+            }},ip={{ pve_template_temporary_vm_cidr }},type=veth
+        nameserver: 10.0.10.222
+        searchdomain: home.prettybaked.com
+        features: fuse=1,mount=ceph;autofs;nfs;cifs,nesting=1
+        cores: 2
+        memory: 4096
+        storage: "{{ pve_template_vm_storage }}"
+        timezone: host
+        pool: Templates
+        pubkey: "{{ pve_template_lxc_ssh_pubkey }}"
+        disk: 10
+        # hookscript: "{{ 'cephfs:snippets/ssh_install.sh' if (pve_template_template_dist_name == 'Rocky') or (pve_template_template_dist_name == 'AlmaLinux') else omit }}"
+        # disk: ""{{ pve_template_vm_storage }}":10,mp=rootfs,acl=0,quota=0,replicate=0,ro=0,size=10G"
+        mounts:
+          mp1: "{{ pve_template_vm_storage }}:10,mp=/opt,size=10G"
+          mp2: "{{ pve_template_vm_storage }}:5,mp=/var,size=5G"
+        unprivileged: false
+        swap: 0
+        timeout: 300
+      register: temporary_vm_info
+      timeout: 300
+      until: temporary_vm_info is not failed
 
-- name: pve_template_lxc_setup | Create template-builder container
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    state: present
-    password: "{{ pve_guest_password }}"
-    hostname: "{{ pve_template_temporary_vm_name }}"
-    ostemplate: cephfs:vztmpl/{{ pve_template_disk_image }}
-    ostype: auto
-    netif:
-      net0: name=eth0,bridge=vmbr0,mtu=9000,firewall=1,gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')
-        }},ip={{ pve_template_temporary_vm_cidr }},type=veth
-    nameserver: 10.0.10.222
-    searchdomain: home.prettybaked.com
-    features: fuse=1,mount=ceph;autofs;nfs;cifs,nesting=1
-    cores: 2
-    memory: 4096
-    storage: "{{ pve_template_vm_storage }}"
-    timezone: host
-    pool: Templates
-    pubkey: "{{ pve_template_lxc_ssh_pubkey }}"
-    disk: 10
-    # hookscript: "{{ 'cephfs:snippets/ssh_install.sh' if (pve_template_template_dist_name == 'Rocky') or (pve_template_template_dist_name == 'AlmaLinux') else omit }}"
-    # disk: ""{{ pve_template_vm_storage }}":10,mp=rootfs,acl=0,quota=0,replicate=0,ro=0,size=10G"
-    mounts:
-      mp1: "{{ pve_template_vm_storage }}:10,mp=/opt,size=10G"
-      mp2: "{{ pve_template_vm_storage }}:5,mp=/var,size=5G"
-    unprivileged: false
-    swap: 0
-    timeout: 300
-  register: temporary_vm_info
-  timeout: 300
-  until: temporary_vm_info is not failed
-  when:
-    - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_setup | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_info }}"
 
-- name: pve_template_lxc_setup | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_info }}"
-  when:
-    - pve_template_template_type == "lxc"
+    - name: pve_template_preinstall | Set pve_template_temporary_vm_vmid
+      ansible.builtin.set_fact:
+        pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
 
-- name: pve_template_preinstall | Set pve_template_temporary_vm_vmid
-  ansible.builtin.set_fact:
-    pve_template_temporary_vm_vmid: "{{ temporary_vm_info.vmid }}"
-  when:
-    - pve_template_template_type == "lxc"
-# - name: pve_template_preinstall | Print pve_template_temporary_vm_vmid
-#   ansible.builtin.debug:
-#     msg: "VMID for {{ pve_template_temporary_vm_name }}: {{ pve_template_temporary_vm_vmid }}"
-#   when:
-#     - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_builder | Ensure Static-IP is set for LXC instance
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        state: started
+        password: "{{ pve_guest_password }}"
+        hostname: "{{ pve_template_temporary_vm_name }}"
+        netif:
+          net0: gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }},ip={{ pve_template_temporary_vm_cidr }}
+        unprivileged: false
+      register: temporary_vm_static_update
+      timeout: 300
+      until: temporary_vm_static_update is not failed
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_lxc_builder | Ensure Static-IP is set for LXC instance
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    state: started
-    password: "{{ pve_guest_password }}"
-    hostname: "{{ pve_template_temporary_vm_name }}"
-    netif:
-      net0: gw={{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }},ip={{ pve_template_temporary_vm_cidr }}
-    unprivileged: false
-  register: temporary_vm_static_update
-  timeout: 300
-  until: temporary_vm_static_update is not failed
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_builder | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_static_update }}"
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_lxc_builder | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_static_update }}"
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
+    - name: pve_template_lxc_builder | Start temporary LXC instance
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        hostname: "{{ pve_template_temporary_vm_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        state: started
+      register: temporary_vm_start
+      timeout: 300
+      until: temporary_vm_start is not failed
+      when:
+        - pve_template_temporary_vm_vmid is defined
 
-- name: pve_template_lxc_builder | Start temporary LXC instance
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    hostname: "{{ pve_template_temporary_vm_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    state: started
-  register: temporary_vm_start
-  timeout: 300
-  until: temporary_vm_start is not failed
-  when:
-    - pve_template_template_type == "lxc"
-    - pve_template_temporary_vm_vmid is defined
+    - name: pve_template_lxc_builder | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_start }}"
 
-- name: pve_template_lxc_builder | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_start }}"
-  when:
-    - pve_template_template_type == "lxc"
-- name: pve_template_preinstall | Wait for {{ pve_template_temporary_vm_name }}
-  ansible.builtin.wait_for:
-    host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
-    port: 22
-    search_regex: OpenSSH
-    connect_timeout: 300
-    delay: 60
-  when:
-    - pve_template_template_type == "lxc"
-- name: pve_template_preinstall | Add temporary VM to 'template_tmp' group
-  ansible.builtin.add_host:
-    groups:
-      - template_tmp
-    pve_template_temporary_vm_name: "{{ pve_template_temporary_vm_name }}"
-    name: "{{ pve_template_temporary_vm_name }}"
-    ansible_host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
-    ansible_python_interpreter: /usr/bin/env python3
-    pve_template_temporary_vm_vmid: "{{ pve_template_temporary_vm_vmid }}"
-    pve_template_template_type: "{{ pve_template_template_type }}"
-  when:
-    - pve_template_template_type == "lxc"
+    - name: pve_template_preinstall | Wait for {{ pve_template_temporary_vm_name }}
+      ansible.builtin.wait_for:
+        host: "{{  pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+        port: 22
+        search_regex: OpenSSH
+        connect_timeout: 300
+        delay: 60
+
+    - name: pve_template_preinstall | Add temporary VM to 'template_tmp' group
+      ansible.builtin.add_host:
+        groups:
+          - template_tmp
+        pve_template_temporary_vm_name: "{{ pve_template_temporary_vm_name }}"
+        name: "{{ pve_template_temporary_vm_name }}"
+        ansible_host: "{{ pve_template_temporary_vm_cidr | ansible.utils.ipaddr('address') }}"
+        ansible_python_interpreter: /usr/bin/env python3
+        pve_template_temporary_vm_vmid: "{{ pve_template_temporary_vm_vmid }}"
+        pve_template_template_type: "{{ pve_template_template_type }}"

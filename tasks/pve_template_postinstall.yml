@@ -1,323 +1,291 @@
 ---
-### LXC POST INSTALL TASKS TO FINISH ANY REMAINING CONFIGURATION AND CREATE THE NEW LXC TEMPLATE
-- name: pve_template_postinstall | Stop temporary LXC instance
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    hostname: "{{ pve_template_temporary_vm_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    state: stopped
-    force: true
-  register: temporary_vm_stop
-  retries: 10
-  timeout: 60
-  delay: 10
-  until: temporary_vm_stop is not failed
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
-
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_stop }}"
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
-
-- name: pve_template_postinstall | Wait for any background processes to complete
-  ansible.builtin.wait_for:
-    timeout: 30
-
-- name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    password: "{{ pve_guest_password }}"
-    hostname: "{{ pve_template_template_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    update: true
-    netif:
-      net0: name=eth0,ip=dhcp,bridge=vmbr0,mtu=9000,firewall=1
-    pool: Templates
-    tags:
-      - lxc
-      - telegraf
-      - "{{ pve_template_template_name | replace('-lxc-template', '') }}"
-  register: temporary_vm_update
-  retries: 10
-  timeout: 60
-  delay: 10
-  until: temporary_vm_update is not failed
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
-
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_update }}"
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
-
-- name: pve_template_postinstall | Wait for any background processes to complete
-  ansible.builtin.wait_for:
-    timeout: 30
-
-- name: pve_template_postinstall | Create LXC template
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    state: template
-    force: true
-    hostname: "{{ pve_template_template_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-  register: template_conversion
-  until: template_conversion is not failed
-  retries: 0
-  timeout: 300
-  delay: 10
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
-
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ template_conversion }}"
-  when:
-    - pve_template_temporary_vm_vmid is defined
-    - pve_template_template_type == "lxc"
-
-- name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
-  ansible.builtin.pause:
-    prompt: |
-      =========================================================================================================
-
-      {% if pve_template_current_template_vmid is defined and pve_template_current_template_vmid != pve_template_temporary_vm_vmid %}
-          !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid | default('') }} !!!
-
-      {% endif %}
-          Please verify that the following NEW template has been created and configured completely:
-
-            Template Name: {{ pve_template_template_name }}
-            Template VMID: {{ pve_template_temporary_vm_vmid }}
-
-          Press [ENTER/RETURN] to continue...
-
-      =========================================================================================================
+- name: Run post-install tasks for LXC Templates
   when:
     - pve_template_template_type == "lxc"
     - pve_template_temporary_vm_vmid is defined
-    - template_conversion is succeeded
+  block:
+    - name: pve_template_postinstall | Stop temporary LXC instance
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        hostname: "{{ pve_template_temporary_vm_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        state: stopped
+        force: true
+      register: temporary_vm_stop
+      retries: 10
+      timeout: 60
+      delay: 10
+      until: temporary_vm_stop is not failed
 
-- name: pve_template_postinstall | Removing old template
-  community.general.proxmox:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    vmid: "{{ pve_template_current_template_vmid }}"
-    state: absent
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_stop }}"
+
+    - name: pve_template_postinstall | Wait for any background processes to complete
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        password: "{{ pve_guest_password }}"
+        hostname: "{{ pve_template_template_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        update: true
+        netif:
+          net0: name=eth0,ip=dhcp,bridge=vmbr0,mtu=9000,firewall=1
+        pool: Templates
+        tags:
+          - lxc
+          - telegraf
+          - "{{ pve_template_template_name | replace('-lxc-template', '') }}"
+      register: temporary_vm_update
+      retries: 10
+      timeout: 60
+      delay: 10
+      until: temporary_vm_update is not failed
+
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_update }}"
+
+    - name: pve_template_postinstall | Wait for any background processes to complete
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: pve_template_postinstall | Create LXC template
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        state: template
+        force: true
+        hostname: "{{ pve_template_template_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+      register: template_conversion
+      until: template_conversion is not failed
+      retries: 0
+      timeout: 300
+      delay: 10
+
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ template_conversion }}"
+
+- name: Run confirmation tasks for LXC
   when:
-    - pve_template_template_type == "lxc"
     - pve_template_current_template_vmid is defined
-    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
-
-  register: template_destroy
-  until: template_destroy is not failed
-  retries: 0
-  timeout: 300
-  delay: 10
-
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ template_destroy }}"
-  when:
     - pve_template_template_type == "lxc"
+  block:
+    - name: pve_template_postinstall | Pausing to confirm template creation from temporary LXC instance
+      ansible.builtin.pause:
+        prompt: |
+          =========================================================================================================
+
+          {% if pve_template_current_template_vmid is defined and pve_template_current_template_vmid != pve_template_temporary_vm_vmid %}
+              !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid | default('') }} !!!
+
+          {% endif %}
+              Please verify that the following NEW template has been created and configured completely:
+
+                Template Name: {{ pve_template_template_name }}
+                Template VMID: {{ pve_template_temporary_vm_vmid }}
+
+              Press [ENTER/RETURN] to continue...
+
+          =========================================================================================================
+      when:
+        - template_conversion is succeeded
+
+    - name: pve_template_postinstall | Removing old template
+      community.general.proxmox:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        vmid: "{{ pve_template_current_template_vmid }}"
+        state: absent
+      register: template_destroy
+      until: template_destroy is not failed
+      retries: 0
+      timeout: 300
+      delay: 10
+      when:
+        - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
+
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ template_destroy }}"
+      when:
+        - pve_template_current_mteplate_vmid != pve_template_temporary_vm_vmid
+
+- name: Run post-install tasks for QEMU templates
+  when:
+    - pve_template_template_type == "qemu"
+    - pve_template_temporary_vm_vmid is defined
+  block:
+    - name: pve_template_postinstall | Stop temporary QEMU instance
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        name: "{{ pve_template_temporary_vm_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        state: stopped
+        force: true
+      register: temporary_vm_stop
+      retries: 10
+      timeout: 60
+      delay: 10
+      until: temporary_vm_stop is not failed
+
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_stop }}"
+
+    - name: pve_template_postinstall | Wait for any background processes to complete
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags for
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        name: "{{ pve_template_template_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        pool: Templates
+        ipconfig:
+          ipconfig0: ip=dhcp
+        net:
+          net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
+        update: true
+        tags:
+          - kvm
+          - telegraf
+          - "{{ pve_template_template_name | replace('-template', '') }}"
+      register: temporary_vm_update
+      retries: 10
+      timeout: 60
+      delay: 10
+      until: temporary_vm_update is not failed
+
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ temporary_vm_update }}"
+
+    - name: pve_template_postinstall | Wait for any background processes to complete
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: pve_template_postinstall | Create QEMU template from ID
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        name: "{{ pve_template_template_name }}"
+        vmid: "{{ pve_template_temporary_vm_vmid }}"
+        node: "{{ pve_node }}"
+        template: true
+        state: template
+      register: template_conversion
+      until: template_conversion is not failed
+      retries: 0
+      timeout: 300
+      delay: 10
+
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ template_conversion }}"
+
+- name: Run confirmation tasks for LXC
+  when:
     - pve_template_current_template_vmid is defined
-    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
-
-### QEMU POST-INSTALL TASKS TO FINISH ANY CONFIGURATION AND CREATE NEW QEMU TEMPLATE
-- name: pve_template_postinstall | Stop temporary QEMU instance
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    name: "{{ pve_template_temporary_vm_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    state: stopped
-    force: true
-  register: temporary_vm_stop
-  retries: 10
-  timeout: 60
-  delay: 10
-  until: temporary_vm_stop is not failed
-  when:
     - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
+  block:
+    - name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
+      ansible.builtin.pause:
+        prompt: |
+          =========================================================================================================
 
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_stop }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
+          {% if pve_template_current_template_vmid is defined and pve_template_current_template_vmid != pve_template_temporary_vm_vmid %}
+              !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid | default('') }} !!!
 
-- name: pve_template_postinstall | Wait for any background processes to complete
-  ansible.builtin.wait_for:
-    timeout: 30
+          {% endif %}
+              Please verify that the following NEW template has been created and configured completely:
 
-- name: pve_template_postinstall | Update Hostname, Set DHCP, Add to Pool and Add Tags for
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    name: "{{ pve_template_template_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    pool: Templates
-    ipconfig:
-      ipconfig0: ip=dhcp
-    net:
-      net0: virtio,bridge=vmbr0,mtu=9000,queues=4,firewall=1
-    update: true
-    tags:
-      - kvm
-      - telegraf
-      - "{{ pve_template_template_name | replace('-template', '') }}"
-  register: temporary_vm_update
-  retries: 10
-  timeout: 60
-  delay: 10
-  until: temporary_vm_update is not failed
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ temporary_vm_update }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
+                Template Name: {{ pve_template_template_name }}
+                Template VMID: {{ pve_template_temporary_vm_vmid }}
 
-- name: pve_template_postinstall | Wait for any background processes to complete
-  ansible.builtin.wait_for:
-    timeout: 30
+              Press [ENTER/RETURN] to continue...
 
-- name: pve_template_postinstall | Create QEMU template from ID
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    name: "{{ pve_template_template_name }}"
-    vmid: "{{ pve_template_temporary_vm_vmid }}"
-    node: "{{ pve_node }}"
-    template: true
-    state: template
-  register: template_conversion
-  until: template_conversion is not failed
-  retries: 0
-  timeout: 300
-  delay: 10
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
+          =========================================================================================================
+      when:
+        - template_conversion is succeeded
 
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ template_conversion }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
+    - name: pve_template_postinstall | Removing old template
+      community.general.proxmox_kvm:
+        api_user: "{{ pve_api_user }}"
+        api_password: "{{ pve_api_password }}"
+        api_token_id: "{{ pve_api_token_id }}"
+        api_token_secret: "{{ pve_api_token_secret }}"
+        api_host: "{{ pve_api_host }}"
+        node: "{{ pve_node }}"
+        vmid: "{{ pve_template_current_template_vmid }}"
+        template: true
+        state: absent
+      register: template_destroy
+      until: template_destroy is not failed
+      retries: 0
+      timeout: 300
+      delay: 10
+      when:
+        - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
 
-- name: pve_template_postinstall | Pausing to confirm template creation from temporary VM
-  ansible.builtin.pause:
-    prompt: |
-      =========================================================================================================
+    - name: pve_template_postinstall | Run Assertion
+      ansible.builtin.include_tasks: pve_handler.yml
+      vars:
+        assertion_task: "{{ template_destroy }}"
+      when:
+        - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
 
-      {% if pve_template_current_template_vmid is defined and pve_template_current_template_vmid != pve_template_temporary_vm_vmid %}
-          !!! The following step will remove a PRE-EXISTING template with VMID: {{ pve_template_current_template_vmid | default('') }} !!!
-
-      {% endif %}
-          Please verify that the following NEW template has been created and configured completely:
-
-            Template Name: {{ pve_template_template_name }}
-            Template VMID: {{ pve_template_temporary_vm_vmid }}
-
-          Press [ENTER/RETURN] to continue...
-
-      =========================================================================================================
-
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_temporary_vm_vmid is defined
-    - template_conversion is succeeded
-
-- name: pve_template_postinstall | Removing old template
-  community.general.proxmox_kvm:
-    api_user: "{{ pve_api_user }}"
-    api_password: "{{ pve_api_password }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
-    api_host: "{{ pve_api_host }}"
-    node: "{{ pve_node }}"
-    vmid: "{{ pve_template_current_template_vmid }}"
-    template: true
-    state: absent
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_current_template_vmid is defined
-    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
-  register: template_destroy
-  until: template_destroy is not failed
-  retries: 0
-  timeout: 300
-  delay: 10
-
-- name: pve_template_postinstall | Run Assertion
-  ansible.builtin.include_tasks: pve_handler.yml
-  vars:
-    assertion_task: "{{ template_destroy }}"
-  when:
-    - pve_template_template_type == "qemu"
-    - pve_template_current_template_vmid is defined
-    - pve_template_current_template_vmid != pve_template_temporary_vm_vmid
-
-- name: pve_template_postinstall | Remove download and working images
-  ansible.builtin.file:
-    name: "{{ pve_template_image }}"
-    state: absent
-  loop:
-    - "{{ pve_template_cloud_image_path }}"
-    - "{{ pve_template_disk_image_path }}"
-  loop_control:
-    loop_var: pve_template_image
-  when:
-    - pve_template_template_type == "qemu"
-    - template_conversion is succeeded
+    - name: pve_template_postinstall | Remove download and working images
+      ansible.builtin.file:
+        name: "{{ pve_template_image }}"
+        state: absent
+      loop:
+        - "{{ pve_template_cloud_image_path }}"
+        - "{{ pve_template_disk_image_path }}"
+      loop_control:
+        loop_var: pve_template_image
+      when:
+        - template_conversion is succeeded
