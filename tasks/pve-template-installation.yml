@@ -1,11 +1,11 @@
 ---
-- name: Run setup tasks
+- name: Run tasks on temporary VM
   block:
-- name: Include base roles on template_tmp guest
-  ansible.builtin.include_role:
-    name: "{{ item }}"
-  loop:
-    - common
-    - ceph-fs
-    - openldap
-    - rsyslog
+    - name: Include base roles on template_tmp guest
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+      loop:
+        - common
+        - ceph-fs
+        - openldap
+        - rsyslog
