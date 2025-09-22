@@ -1,9 +1,33 @@
 ---
+- name: Debug
+  ansible.builtin.debug:
+    var: hostvars[item]['ip_address']
+    verbosity: 1
+
+- name: Assert values are set
+  ansible.builtin.assert:
+    that:
+      - (hostname is defined and hostname == hostvars[item]['hostname'])
+      - (vmid is defined and vmid == hostvars[item]['vmid'] and vmid is number and vmid is integer)
+      - (dest_node is defined and dest_node == hostvars[item]['dest_node'] and dest_node is regex('pve\d+'))
+      - (pve_kvm_tags is defined and pve_kvm_tags == hostvars[item]['pve_kvm_tags'] and pve_kvm_tags is not mapping and pve_kvm_tags is iterable)
+      - (hostvars[item]['ip_address'] is defined and hostvars[item]['ip_address'] is ansible.utils.ipv4)
+      - (root_disk_gb is defined and root_disk_gb == hostvars[item]['root_disk_gb'] and root_disk_gb is number and root_disk_gb is integer)
+      - >-
+        (sockets is defined and sockets == hostvars[item]['sockets'] and sockets is number
+          and sockets is integer)
+      - >-
+        (cores is defined and cores == hostvars[item]['cores'] and cores is number
+          and cores is integer)
+      - >-
+        (memory_mb is defined and memory_mb == hostvars[item]['memory_mb'] and
+          memory_mb is number and memory_mb is integer)
+
 - name: pve_kvm_create | Create {{ hostname }}
-  community.general.proxmox_kvm:
+  community.proxmox.proxmox_kvm:
+
     api_user: "{{ pve_api_user }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
+    api_password: "{{ pve_api_password }}"
     api_host: "{{ pve_api_host }}"
     validate_certs: false
     node: "{{ pve_node }}"
@@ -15,7 +39,7 @@
     state: present
     timeout: 300
   register: kvm_deploy
-  retries: 10
+  retries: 3
   until: kvm_deploy is not failed
 
 - name: pve_kvm_create | Assert successful deploy for {{ hostname }}
@@ -24,10 +48,11 @@
     assertion_task: "{{ kvm_deploy }}"
 
 - name: pve_kvm_create | Create data volume for {{ hostname }}
-  community.general.proxmox_disk:
+  community.proxmox.proxmox_disk:
     api_user: "{{ pve_api_user }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
+    api_password: "{{ pve_api_password }}"
+    # api_token_id: "{{ pve_api_token_id }}"
+    # api_token_secret: "{{ pve_api_token_secret }}"
     api_host: "{{ pve_api_host }}"
     validate_certs: false
     disk: scsi1
@@ -49,7 +74,7 @@
     assertion_task: "{{ kvm_data_volume }}"
 
 - name: pve_kvm_create | Update {{ hostname }}
-  community.general.proxmox_kvm:
+  community.proxmox.proxmox_kvm:
     api_user: "{{ pve_api_user }}"
     api_password: "{{ pve_api_password }}"
     # api_token_id: "{{ pve_api_token_id }}"
@@ -62,16 +87,21 @@
     ciuser: root
     cipassword: "{{ pve_guest_password }}"
     sshkeys: "{{ pve_template_ci_ssh_keys }}"
-    nameservers: "{{ pve_lxc_nameserver }}"
-    searchdomains: "{{ pve_lxc_searchdomain }}"
+    nameservers: "{{ pve_nameservers }}"
+    searchdomains: "{{ pve_searchdomains }}"
+    net:
+      net0: "virtio,bridge=vmbr0"
     ipconfig:
-      ipconfig0: "ip={{ ip_address ~ '/24' }},gw={{ (ip_address ~ '/24') | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address') }}"
-    hostpci:
-      hostpci0: host=0000:5e:00.0,pcie=1,rombar=1
+      ipconfig0: |-
+        {%- set ip = [] -%}
+        {%- set gw = [] -%}
+        {%- set ip = (hostvars[item]['ip_address'] | string) ~ '/24' -%}
+        {%- set gw = (ip | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')) -%}
+        {{  'ip=' ~ ip ~ ',gw=' ~ gw }}
     scsi:
       scsi1:
         storage: "{{ pve_template_vm_storage }}"
-        size: 5
+        size: "{{ root_disk_gb }}"
         format: "{{ pve_template_vm_storage_format }}"
         backup: 0
         discard: 1
@@ -80,11 +110,11 @@
         ssd: 1
         iothread: 1
     update: true
-    sockets: 2
-    cores: 4
-    vcpus: 8
+    sockets: "{{ sockets }}"
+    cores: "{{ cores }}"
+    vcpus: "{{ sockets * cores }}"
     tags: "{{ pve_kvm_tags }}"
-    memory: 8192
+    memory: "{{ memory_mb }}"
     timeout: 300
   register: kvm_update
   retries: 10
@@ -96,7 +126,7 @@
     assertion_task: "{{ kvm_update }}"
 
 # - name: pve_kvm_create | Resize disk
-#   community.general.proxmox_disk:
+#   community.proxmox.proxmox_disk:
 #     api_user: "{{ pve_api_user }}"
 #     api_password: "{{ pve_api_password }}"
 #     api_host: "{{ pve_api_host }}"
@@ -115,10 +145,10 @@
 #     assertion_task: "{{ kvm_disk_resize }}"
 
 - name: pve_kvm_create | Start {{ hostname }}
-  community.general.proxmox_kvm:
+  community.proxmox.proxmox_kvm:
+
     api_user: "{{ pve_api_user }}"
-    api_token_id: "{{ pve_api_token_id }}"
-    api_token_secret: "{{ pve_api_token_secret }}"
+    api_password: "{{ pve_api_password }}"
     api_host: "{{ pve_api_host }}"
     validate_certs: false
     name: "{{ hostname }}"
