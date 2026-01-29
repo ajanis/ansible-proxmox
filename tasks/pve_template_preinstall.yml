@@ -76,6 +76,7 @@
       ansible.builtin.include_tasks: pve_handler.yml
       vars:
         assertion_task: "{{ cloud_image_download }}"
+      when: cloud_image_download is changed
 
     - name: pve_template_qemu_setup | Convert image to raw
       ansible.builtin.command:
@@ -89,6 +90,7 @@
       ansible.builtin.include_tasks: pve_handler.yml
       vars:
         assertion_task: "{{ image_conversion }}"
+      when: image_conversion is changed
 
     - name: pve_template_qemu_setup | Run libguestfs commands against image
       ansible.builtin.command:

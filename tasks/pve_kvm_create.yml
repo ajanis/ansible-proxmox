@@ -1,27 +1,24 @@
 ---
 - name: Debug
   ansible.builtin.debug:
-    var: hostvars[item]['ip_address']
+    var: ip_address
     verbosity: 1
 
 - name: Assert values are set
   ansible.builtin.assert:
     that:
-      - (hostname is defined and hostname == hostvars[item]['hostname'])
-      - (vmid is defined and vmid == hostvars[item]['vmid'] and vmid is number and vmid is integer)
-      - (dest_node is defined and dest_node == hostvars[item]['dest_node'] and dest_node is regex('pve\d+'))
-      - (pve_kvm_tags is defined and pve_kvm_tags == hostvars[item]['pve_kvm_tags'] and pve_kvm_tags is not mapping and pve_kvm_tags is iterable)
-      - (hostvars[item]['ip_address'] is defined and hostvars[item]['ip_address'] is ansible.utils.ipv4)
-      - (root_disk_gb is defined and root_disk_gb == hostvars[item]['root_disk_gb'] and root_disk_gb is number and root_disk_gb is integer)
+      - (hostname is defined and hostname == item)
+      - (vmid is defined and vmid is number and vmid is integer)
+      - (dest_node is defined and dest_node is regex('pve\d+'))
+      - (pve_kvm_tags is defined and pve_kvm_tags is not mapping and pve_kvm_tags is iterable)
+      - (ip_address is defined and ip_address is ansible.utils.ipv4)
+      - (root_disk_gb is defined and root_disk_gb is number and root_disk_gb is integer)
       - >-
-        (sockets is defined and sockets == hostvars[item]['sockets'] and sockets is number
-          and sockets is integer)
+        (sockets is defined and sockets is number and sockets is integer)
       - >-
-        (cores is defined and cores == hostvars[item]['cores'] and cores is number
-          and cores is integer)
+        (cores is defined and cores is number and cores is integer)
       - >-
-        (memory_mb is defined and memory_mb == hostvars[item]['memory_mb'] and
-          memory_mb is number and memory_mb is integer)
+        (memory_mb is defined and memory_mb is number and memory_mb is integer)
 
 - name: pve_kvm_create | Create {{ hostname }}
   community.proxmox.proxmox_kvm:
@@ -95,7 +92,7 @@
       ipconfig0: |-
         {%- set ip = [] -%}
         {%- set gw = [] -%}
-        {%- set ip = (hostvars[item]['ip_address'] | string) ~ '/24' -%}
+        {%- set ip = (ip_address | string) ~ '/24' -%}
         {%- set gw = (ip | ansible.utils.ipaddr('1') | ansible.utils.ipaddr('address')) -%}
         {{  'ip=' ~ ip ~ ',gw=' ~ gw }}
     scsi:
