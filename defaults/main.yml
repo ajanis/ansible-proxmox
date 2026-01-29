@@ -42,16 +42,23 @@ pve_template_cloud_images:
   ubuntu2204:
     dist_name: Ubuntu
     dist_release: 22.04
-    dist_checksum: sha256:https://cloud-images.ubuntu.com/releases/22.04/release/SHA256SUMS
+    dist_checksum: sha256:ttps://cloud-images.ubuntu.com/jammy/current/SHA256SUMS
     dist_arch: x86_64
-    dist_url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img
+    dist_url: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
     lxc_url: http://download.proxmox.com/images/system/ubuntu-22.04-standard_22.04-1_amd64.tar.zst
   ubuntu2404:
     dist_name: Ubuntu
     dist_release: 24.04
-    dist_checksum: sha256:https://cloud-images.ubuntu.com/releases/24.04/release/SHA256SUMS
+    dist_checksum: sha256:https://cloud-images.ubuntu.com/noble/current/SHA256SUMS
     dist_arch: x86_64
-    dist_url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+    dist_url: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+    lxc_url: http://download.proxmox.com/images/system/ubuntu-24.04-standard_24.04-2_amd64.tar.zst
+  ubuntu2604:
+    dist_name: Ubuntu
+    dist_release: 26.04
+    dist_checksum: sha256:https://cloud-images.ubuntu.com/resolute/current/SHA256SUMS
+    dist_arch: x86_64
+    dist_url: https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img
     lxc_url: http://download.proxmox.com/images/system/ubuntu-24.04-standard_24.04-2_amd64.tar.zst
 
 pve_template_lxc_ssh_pubkey: ""
