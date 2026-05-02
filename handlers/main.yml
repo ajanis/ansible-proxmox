@@ -1,0 +1,12 @@
+---
+- name: Host Reboot
+  listen: Reboot System
+  ansible.builtin.reboot:
+    connect_timeout: 10
+    reboot_timeout: 900
+    post_reboot_delay: 90
+    msg: Rebooting system via Ansible
+
+- name: Proxmox Boot Tool Refresh
+  ansible.builtin.command:
+    cmd: pve-efiboot-tool refresh
