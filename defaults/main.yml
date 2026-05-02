@@ -67,3 +67,189 @@ pve_template_lxc_ssh_pubkey: ""
 # vault_pve_api_token_id:
 # vault_pve_api_password:
 # vault_pve_guest_password:
+pve_vgpu: false
+
+# apt_repos:
+#   - name: ceph
+#     types: deb
+#     enabled: true
+#     state: present
+#     uris: http://download.proxmox.com/{{ ansible_distribution | lower }}/ceph-{{ pve_ceph_release }}
+#     suites: "{{ ansible_distribution_release | lower }}"
+#     components: no-subscription
+#     signed_by: https://enterprise.proxmox.com/debian/proxmox-release-{{ ansible_distribution_release | lower }}.gpg
+#   - name: proxmox-free
+#     types: deb
+#     enabled: true
+#     state: present
+#     uris: http://download.proxmox.com/{{ ansible_distribution | lower }}/pve
+#     suites: "{{ ansible_distribution_release | lower }}"
+#     components: pve-no-subscription
+#     signed_by: https://enterprise.proxmox.com/debian/proxmox-release-{{ ansible_distribution_release | lower }}.gpg
+#   - name: proxmox-enterprise
+#     types: deb
+#     state: absent
+#     enabled: false
+#     uris: https://enterprise.proxmox.com/{{ ansible_distribution | lower }}/pve
+#     suites: "{{ ansible_distribution_release | lower }}"
+#     components: pve-enterprise
+#     signed_by: https://enterprise.proxmox.com/debian/proxmox-release-{{ ansible_distribution_release | lower }}.gpg
+#   - name: influxdata
+#     types: deb
+#     state: present
+#     enabled: true
+#     uris: https://repos.influxdata.com/{{ ansible_distribution | lower }}
+#     suites: "{{ ansible_distribution_release | lower }}"
+#     components: stable
+#     signed_by: https://repos.influxdata.com/influxdata-archive_compat.key
+# apt_pkgs:
+#   - git
+#   - build-essential
+#   - dkms
+#   - pve-headers
+#   - mdevctl
+#   - ksm-control-daemon
+#   - telegraf
+#   - ceph-common
+
+# git_repos:
+#   - repo: https://gitlab.com/polloloco/vgpu-proxmox.git
+#     version: master
+#     single_branch: true
+#     dest: /root/vgpu-proxmox
+#   - repo: https://github.com/mbilker/vgpu_unlock-rs.git
+#     version: master
+#     single_branch: true
+#     dest: /opt/vgpu_unlock-rs
+
+# services:
+#   - name: ksm
+#     state: started
+#     enabled: true
+#   - name: ksmtuned
+#     state: started
+#     enabled: true
+#   - name: nvidia-vgpud
+#     state: stopped
+#     enabled: false
+#   - name: nvidia-vgpu-manager
+#     state: stopped
+#     enabled: false
+
+sysctl_settings:
+  - name: fs.file-max
+    value: "26234859"
+  - name: vm.zone_reclaim_mode
+    value: "0"
+  - name: vm.swappiness
+    value: "10"
+# - name: net.nf_conntrack_max
+#   value: "4194304"
+
+# kernel_modules:
+#   - name: nvidia_vgpu_vfio
+#     state: present
+#     persistent: present
+#   - name: sg
+#     state: present
+#     persistent: present
+
+whitelist_kernel_modules:
+  - name: vfio_iommu_type1
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: absent
+  - name: vfio
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: absent
+  - name: vfio_pci
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: absent
+  - name: vfio_iommu_type1
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: absent
+
+blacklist_kernel_modules:
+  - name: nouveau
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: present
+  - name: vfio_iommu_type1
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: present
+  - name: vfio
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: present
+  - name: vfio_pci
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: present
+  - name: vfio_iommu_type1
+    blacklist_file: /etc/modprobe.d/blacklist.conf
+    state: present
+
+# directories:
+#   - path: /etc/vgpu_unlock/
+#     mode: "0644"
+#     owner: root
+#     group: root
+#   - path: /etc/systemd/system/nvidia-vgpud.service.d
+#     mode: "0644"
+#     owner: root
+#     group: root
+#   - path: /etc/systemd/system/nvidia-vgpu-mgr.service.d
+#     mode: "0644"
+#     owner: root
+#     group: root
+
+# config_files:
+#   - dest: /etc/vgpu_unlock/profile_override.toml
+#     mode: "0744"
+#     owner: root
+#     group: root
+#     content: |
+#       [profile.nvidia-227]
+#       cuda_enabled = 1
+#   - dest: /etc/vgpu_unlock/config.toml
+#     mode: "0744"
+#     owner: root
+#     group: root
+#     content: |
+#       unlock = false
+#   - dest: /etc/systemd/system/nvidia-vgpud.service.d/vgpu_unlock.conf
+#     mode: "0744"
+#     owner: root
+#     group: root
+#     content: |
+#       [Service]
+#       Environment=LD_PRELOAD=/opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so
+#   - dest: /etc/systemd/system/nvidia-vgpu-mgr.service.d/vgpu_unlock.conf
+#     mode: "0744"
+#     owner: root
+#     group: root
+#     content: |
+#       [Service]
+#       Environment=LD_PRELOAD=/opt/vgpu_unlock-rs/target/release/libvgpu_unlock_rs.so
+# rm_files:
+#   - path: /etc/apt/sources.list.d/ceph.list
+#     mode: "0600"
+#     owner: root
+#     group: root
+#   - path: /etc/apt/sources.list.d/pve-community.list
+#     mode: "0600"
+#     owner: root
+#     group: root
+#   - path: /etc/modules-load.d/vfio.conf
+#     mode: "0600"
+#     owner: root
+#     group: root
+# grub_configs:
+#   - regexp: '^GRUB_CMDLINE_LINUX=".*"$'
+#     line: GRUB_CMDLINE_LINUX="console=ttyS{{ serial_tty_device | default('0') }},115200 console=tty{{ console_tty_device | default('1') }} net.ifnames=0
+#       biosdevname=0"
+#   - regexp: '^GRUB_CMDLINE_LINUX_DEFAULT=".*"$'
+#     line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on"'
+#     backrefs: true
+#   - regexp: '^GRUB_TERMINAL=".*"$'
+#     line: 'GRUB_TERMINAL="console serial"'
+#   - regexp: "^GRUB_TIMEOUT=[0-9]+$"
+#     line: "GRUB_TIMEOUT=10"
+#   - regexp: '^GRUB_SERIAL_COMMAND=".*"$'
+#     line: GRUB_SERIAL_COMMAND="serial --speed=115200 --unit={{ serial_tty_device | default('0') }} --word=8 --parity=no --stop=1"

@@ -38,7 +38,7 @@
 
 - name: Ask user if this is a new driver install or an upgrade/reinstall
   tags:
-    - vgpu-driver
+    - proxmox-postinstall
   block:
     - name: Prompt user for 'new' install or 'upgrade/reinstall' of nVidia drivers and kernel modules
       ansible.builtin.pause:
@@ -62,11 +62,14 @@
       ansible.builtin.debug:
         var: driver_type_installation
       when:
-        - driver_install_type_set.changed
+        - driver_install_type_set is defined
+        - driver_install_type_set is not None
 
 - name: Remove existing nVidia drivers and configurations
   when:
     - driver_type_installation == "update"
+  tags:
+    - proxmox-postinstall
   block:
     - name: Remove nVidia Driver
       ansible.builtin.apt:
@@ -91,16 +94,15 @@
 
 - name: Run Apt repository and package tasks
   tags:
-    - vgpu-driver
-    - apt
+    - proxmox-postinstall
   block:
     - name: Include apt tasks from common
       ansible.builtin.include_role:
         name: common
         tasks_from: packages-debian
       vars:
-        common_apt_repos: "{{ apt_repos }}"
-        common_apt_pkgs: "{{ apt_pkgs }}"
+        common_apt_repos: "{{ apt_repos | default([]) }}"
+        common_apt_pkgs: "{{ apt_pkgs | default([]) }}"
 
     - name: Set GCC Compiler to GCC-12
       community.general.alternatives:
@@ -110,16 +112,17 @@
         state: selected
 
 - name: VGPU Unlocker Tasks
+  when:
+    - pve_vgpu | default(false)
   tags:
-    - vgpu-driver
-    - vgpu-unlock
+    - proxmox-postinstall
   block:
     - name: Clone git repositories
       ansible.builtin.git:
         clone: true # noqa latest
         version: HEAD
       args: "{{ item }}"
-      loop: "{{ git_repos }}"
+      loop: "{{ git_repos | default([]) }}"
 
     - name: Download Rust Compiler Installer Script
       ansible.builtin.get_url:
@@ -142,8 +145,7 @@
 
 - name: Update Bootloader and Kernel Modules
   tags:
-    - vgpu-driver
-    - vgpu-iommu
+    - proxmox-postinstall
   block:
     - name: Check boot mode
       ansible.builtin.stat:
@@ -168,28 +170,33 @@
       ansible.builtin.lineinfile:
         path: /etc/kernel/cmdline
         regexp: "^root=ZFS.*$"
-        line: "root=ZFS=rpool/ROOT/pve-1 boot=zfs intel_iommu=on console={{ 'ttyS' ~ serial_tty_device | default('ttyS0') }},115200 console={{ 'tty' ~ console_tty_device
-          | default('tty1') }}"
+        line: "root=ZFS=rpool/ROOT/pve-1 boot=zfs intel_iommu=on console={{ 'ttyS' ~ serial_tty_device | default('ttyS0') }},115200 console={{ 'tty' ~ console_tty_device|
+          default('tty1') }}"
       notify:
         - Proxmox Boot Tool Refresh
       when:
         - zfs_boot_check.stat.exists
 
+- name: Update Bootloader and Kernel Modules
+  tags:
+    - proxmox-postinstall
+  block:
     - name: Configure Imported and Blacklisted Kernel modules
       ansible.builtin.include_role:
         name: common
         tasks_from: kernel-modules
       vars:
         common_blacklist_kernel_modules: "{{ blacklist_kernel_modules }}"
-        common_kernel_modules: "[]"
+        common_kernel_modules: []
 
-    - name: Flush handlers
-      ansible.builtin.meta: flush_handlers
+- name: Flush Handlers
+  ansible.builtin.meta: flush_handlers
 
 - name: Patch and install nVidia vGPU Driver
+  when:
+    - pve_vgpu | default(false)
   tags:
-    - vgpu-driver
-    - vgpu-patch
+    - proxmox-postinstall
   block:
     - name: Copy Patched nVidia Driver Script
       ansible.builtin.copy:
@@ -198,7 +205,6 @@
         mode: "0777"
         remote_src: true
       register: nvidia_driver_copy
-      notify: Run NVidia Driver Script
 
     - name: Run nVidia Driver Build Script
       ansible.builtin.shell:
@@ -210,23 +216,29 @@
         CC: /usr/bin/gcc-12
       changed_when:
         - nvidia_driver_update is success
-      when:
-        - build_nvidia_driver | default(true)
       notify:
         - Reboot System
+
+- name: Update Bootloader and Kernel Modules
+  tags:
+    - proxmox-postinstall
+  block:
     - name: Configure Imported and Blacklisted Kernel modules
       ansible.builtin.include_role:
         name: common
         tasks_from: kernel-modules
       vars:
-        common_blacklist_kernel_modules: "{{ whitelist_kernel_modules }}"
-        common_kernel_modules: "{{ kernel_modules }}"
-    - name: Flush handlers
-      ansible.builtin.meta: flush_handlers
+        common_blacklist_kernel_modules: "{{ whitelist_kernel_modules | default([]) }}"
+        common_kernel_modules: "{{ kernel_modules | default([]) }}"
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
 
 - name: Validate mediate device presence
+  when:
+    - pve_vgpu | default(false)
   tags:
-    - vgpu-mdev
+    - proxmox-postinstall
   block:
     - name: Gather mdevctl Types
       ansible.builtin.command:
